@@ -1,4 +1,7 @@
 usePlugin("@nomiclabs/buidler-truffle5");
+usePlugin('solidity-coverage')
+usePlugin('buidler-gas-reporter')
+
 module.exports = {
   defaultNetwork: "buidlerevm",
     networks: {

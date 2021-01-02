@@ -76,8 +76,18 @@ module.exports = {
 
   // Set default mocha options here, use special reporters etc.
   mocha: {
-    // timeout: 100000
+    timeout: 100000,
+    reporter: 'eth-gas-reporter',
+    reporterOptions: {
+      coinmarketcap: '9250d478-4d5d-42e5-988d-01080e4e8a67',
+      currency: 'usd',
+    },
   },
+
+  plugins: [
+    "solidity-coverage",
+    'truffle-plugin-verify',
+  ],
 
   networks: {
     development: {

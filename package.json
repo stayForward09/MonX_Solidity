@@ -6,7 +6,9 @@
   "dependencies": {
     "@openzeppelin/contracts": "^3.1.0",
     "@openzeppelin/test-helpers": "^0.5.6",
+    "buidler-gas-reporter": "^0.1.4",
     "solc": "^0.7.1",
+    "solidity-coverage": "^0.7.13",
     "truffle": "^5.1.41",
     "truffle-flattener": "^1.4.4"
   },
