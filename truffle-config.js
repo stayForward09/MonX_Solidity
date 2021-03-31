@@ -1,3 +1,5 @@
+const HDWalletProvider = require("@truffle/hdwallet-provider")
+require('dotenv').config()
 /**
  * Use this file to configure your truffle project. It's seeded with some
  * common settings for different networks and features like migrations,
@@ -89,14 +91,51 @@ module.exports = {
     'truffle-plugin-verify',
   ],
 
+  api_keys: {
+    etherscan: process.env.ETHERSCAN_TOKEN,
+  },
+
   networks: {
     development: {
       host: "127.0.0.1",
       port: 8545,
       network_id: "*",
       gasPrice: 1,
-      gas: 80000000,
+      // gas: 80000000,
      },
+    mainnet: { 
+      provider: new HDWalletProvider(
+        process.env.DEPLOYER_PK,
+        // [process.env.DEPLOYMENT_ACCOUNT_KEY], 
+        "https://mainnet.infura.io/v3/" + process.env.INFURA_API_KEY, 0, 1),
+      network_id: 1,
+      gas: 5000000,
+      gasPrice: 30000000000, // 30 Gwei
+      // from: process.env.DEPLOYER_ACCOUNT,
+      // skipDryRun: true
+    },
+    kovan: { 
+      provider: new HDWalletProvider(
+        process.env.DEPLOYER_PK,
+        // [process.env.DEPLOYMENT_ACCOUNT_KEY], 
+        "https://kovan.infura.io/v3/" + process.env.INFURA_API_KEY, 0, 1),
+      network_id: 42,
+      gas: 5000000,
+      gasPrice: 30000000000, // 30 Gwei
+      // from: process.env.DEPLOYER_ACCOUNT,
+      // skipDryRun: true
+    },
+    ropsten: { 
+      provider: new HDWalletProvider(
+        process.env.DEPLOYER_PK,
+        // [process.env.DEPLOYMENT_ACCOUNT_KEY], 
+        "https://ropsten.infura.io/v3/" + process.env.INFURA_API_KEY, 0, 1),
+      network_id: 3,
+      gas: 5000000,
+      gasPrice: 5000000000, // 5 Gwei
+      // from: process.env.DEPLOYER_ACCOUNT,
+      // skipDryRun: true
+    },
     GUI: {
       host: "127.0.0.1",
       port: 7545,

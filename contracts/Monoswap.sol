@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/math/Math.sol";
-import "@nomiclabs/buidler/console.sol";
+// import "@openzeppelin/contracts/math/Math.sol";
+// import "@nomiclabs/buidler/console.sol";
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -122,6 +122,8 @@ contract Monoswap is ERC1155, Ownable {
     devFee = _devFee;
   }
 
+  // TODO: update status of a pool. onlyOwner.
+
   function mint (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].add(amount);
     _mint(account, id, amount, "");
@@ -132,6 +134,7 @@ contract Monoswap is ERC1155, Ownable {
     _burn(account, id, amount);
   }
 
+  // creates a pool
   function _createPool (address _token, uint112 _price, PoolStatus _status) lock internal returns(uint256 _pid)  {
     require(tokenPoolStatus[_token]==0, "Monoswap: Token Exists");
     require (_token != address(vUSD), "Monoswap: vUSD pool not allowed");
@@ -151,20 +154,26 @@ contract Monoswap is ERC1155, Ownable {
     tokenPoolStatus[_token]=1;
   }
 
+  // creates an official pool
   function addOfficialToken (address _token, uint112 _price) onlyOwner external returns(uint256 _pid)  {
     _pid = _createPool(_token, _price, PoolStatus.OFFICIAL);
   }
 
+  // internal func to pay contract owner
   function _mintFee (uint256 pid, uint256 lastPoolValue, uint256 newPoolValue) internal {
     uint256 _totalSupply = totalSupply[pid];
     if(newPoolValue>lastPoolValue && lastPoolValue>0) {
+      // safe ops, since newPoolValue>lastPoolValue
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
+
+      // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
       mint(feeTo, pid, devLiquidity);
     }
 
   }
 
+  // util func to get some basic pool info
   function getPool (address _token) view public returns (uint256 poolValue, 
     uint256 tokenBalanceVusdValue, uint256 vusdCredit, uint256 vusdDebt) {
     PoolInfo memory pool = pools[_token];
@@ -175,6 +184,7 @@ contract Monoswap is ERC1155, Ownable {
     poolValue = tokenBalanceVusdValue.add(vusdCredit).sub(vusdDebt);
   }
 
+  // trustless listing pool creation. always creates unofficial pool
   function listNewToken (address _token, uint112 _price, 
     uint256 vusdAmount, 
     uint256 tokenAmount,
@@ -183,6 +193,7 @@ contract Monoswap is ERC1155, Ownable {
     liquidity = addLiquidityPair(_token, vusdAmount, tokenAmount, to);
   }
 
+  // add liquidity pair to a pool. allows adding vusd.
   function addLiquidityPair (address _token, 
     uint256 vusdAmount, 
     uint256 tokenAmount,
@@ -191,22 +202,14 @@ contract Monoswap is ERC1155, Ownable {
 
     require(tokenPoolStatus[_token]==1, "Monoswap: No pool");
 
-    // if(tokenPoolStatus[_token]!=1 && vusdAmount > 0 && tokenAmount > 0) {
-    //   // vusd back determines token price
-    //   uint256 initialPrice = vusdAmount.mul(1e18).div(tokenAmount);
-    //   _createPool(_token, initialPrice, PoolStatus.LISTED);
-    // }
     (uint256 poolValue, , ,) = getPool(_token);
     PoolInfo memory pool = pools[_token];
-
-    // require (pool.status==PoolStatus.OFFICIAL || vusdAmount>0, 
-    //   "Monoswap: vUSD Required for unofficial pools");
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = totalSupply[pool.pid];
-    IERC20(_token).safeTransferFrom(to, address(this), tokenAmount);
+    IERC20(_token).safeTransferFrom(msg.sender, address(this), tokenAmount);
     if(vusdAmount>0){
-      vUSD.safeTransferFrom(to, address(this), vusdAmount);
+      vUSD.safeTransferFrom(msg.sender, address(this), vusdAmount);
     }
 
     uint256 liquidityVusdValue = vusdAmount.add(tokenAmount.mul(pool.price)/1e18);
@@ -227,11 +230,12 @@ contract Monoswap is ERC1155, Ownable {
     vusdAmount, tokenAmount);
   }
   
-
+  // add one-sided liquidity to a pool. no vusd
   function addLiquidity (address _token, uint256 _amount, address to) external returns(uint256 liquidity)  {
     liquidity = addLiquidityPair(_token, 0, _amount, to);
   }  
 
+  // updates pool vusd balance, token balance and last pool value.
   // this function requires others to do the input validation
   function _syncPoolInfo (address _token, uint256 vusdIn, uint256 vusdOut) lockToken(_token) internal returns(uint256 poolValue, 
     uint256 tokenBalanceVusdValue, uint256 vusdCredit, uint256 vusdDebt) {
@@ -242,11 +246,13 @@ contract Monoswap is ERC1155, Ownable {
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
     tokenBalanceVusdValue = tokenPoolPrice.mul(tokenReserve)/1e18;
 
+    require(tokenReserve <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(tokenReserve);
     poolValue = tokenBalanceVusdValue.add(vusdCredit).sub(vusdDebt);
     pools[_token].lastPoolValue = poolValue;
   }
   
+  // view func for removing liquidity
   function _removeLiquidity (address _token, uint256 liquidity,
     address to) view public returns(
     uint256 poolValue, uint256 liquidityIn, uint256 vusdOut, uint256 tokenOut) {
@@ -258,7 +264,8 @@ contract Monoswap is ERC1155, Ownable {
     PoolInfo memory pool = pools[_token];
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = totalSupply[pool.pid];
-    liquidityIn = Math.min(balanceOf(to, pool.pid), liquidity);
+
+    liquidityIn = balanceOf(to, pool.pid)>liquidity?liquidity:balanceOf(to, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
     
     if(tokenReserve < pool.tokenBalance){
@@ -276,7 +283,7 @@ contract Monoswap is ERC1155, Ownable {
 
   }
   
-  
+  // actually removes liquidity
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
     uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
@@ -308,6 +315,7 @@ contract Monoswap is ERC1155, Ownable {
     
   }
 
+  // util func to compute new price
   function _getNewPrice (uint256 originalPrice, uint256 reserve, 
     uint256 delta, TxType txType) pure internal returns(uint256 price) {
     if(txType==TxType.SELL) {
@@ -318,7 +326,212 @@ contract Monoswap is ERC1155, Ownable {
     }
   }
 
-  // given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
+  // standard swap interface implementing uniswap router V2
+  // TODO: add ETH
+  function swapExactTokenForToken(
+    address tokenIn,
+    address tokenOut,
+    uint amountIn,
+    uint amountOutMin,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountOut) {
+    amountOut = swapIn(tokenIn, tokenOut, to, amountIn);
+    require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
+  }
+
+  function swapTokenForExactToken(
+    address tokenIn,
+    address tokenOut,
+    uint amountInMax,
+    uint amountOut,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountIn) {
+    amountIn = swapOut(tokenIn, tokenOut, to, amountOut);
+    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+  }
+
+  // util func to manipulate vusd balance
+  function vusdBalanceAdd (uint256 _credit, uint256 _debt, 
+    uint256 delta) internal pure returns (uint256 _newCredit, uint256 _newDebt) {
+    if(_debt>0){
+      if(delta>_debt){
+        _newDebt = 0;
+        _newCredit = _credit.add(delta - _debt);
+      }else{
+        _newCredit = 0;
+        _newDebt = _debt - delta;
+      }
+    }else{
+      _newCredit = _credit.add(delta);
+      _newDebt = 0;
+    }
+  }
+
+  // util func to manipulate vusd balance
+  function vusdBalanceSub (uint256 _credit, uint256 _debt, 
+    uint256 delta) internal pure returns (uint256 _newCredit, uint256 _newDebt) {
+    if(_credit>0){
+      if(delta>_credit){
+        _newCredit = 0;
+        _newDebt = delta - _credit;
+      }else{
+        _newCredit = _credit - delta;
+        _newDebt = 0;
+      }
+    }else{
+      _newCredit = 0;
+      _newDebt = _debt.add(delta);
+    }
+  } 
+
+  // util func to manipulate vusd balance
+  function _updateVusdBalance (address _token, 
+    uint _vusdIn, uint _vusdOut) internal returns (uint _vusdCredit, uint _vusdDebt) {
+    if(_vusdIn>_vusdOut){
+      _vusdIn = _vusdIn - _vusdOut;
+      _vusdOut = 0;
+    }else{
+      _vusdOut = _vusdOut - _vusdIn;
+      _vusdIn = 0;
+    }
+
+    // PoolInfo memory _pool = pools[_token];
+    uint _poolVusdCredit = pools[_token].vusdCredit;
+    uint _poolVusdDebt = pools[_token].vusdDebt;
+    PoolStatus _poolStatus = pools[_token].status;
+    
+    if(_vusdOut>0){
+      (_vusdCredit, _vusdDebt) = vusdBalanceSub(
+        _poolVusdCredit, _poolVusdDebt, _vusdOut);
+      require(_vusdCredit <= uint112(-1) && _vusdDebt <= uint112(-1), 'OVERFLOW');
+      pools[_token].vusdCredit = uint112(_vusdCredit);
+      pools[_token].vusdDebt = uint112(_vusdDebt);
+    }
+
+    if(_vusdIn>0){
+      (_vusdCredit, _vusdDebt) = vusdBalanceAdd(
+        _poolVusdCredit, _poolVusdDebt, _vusdIn);
+      require(_vusdCredit <= uint112(-1) && _vusdDebt <= uint112(-1), 'OVERFLOW');
+      pools[_token].vusdCredit = uint112(_vusdCredit);
+      pools[_token].vusdDebt = uint112(_vusdDebt);
+    }
+
+    if(_poolStatus == PoolStatus.LISTED){
+
+      require (_vusdCredit>=0 && _vusdDebt==0, "Monoswap: unofficial pool cannot bear debt");
+    }
+  }
+  
+  // updates pool token balance and price.
+  function _updateTokenInfo (address _token, uint256 _price,
+      uint256 _vusdIn, uint256 _vusdOut) internal {
+    uint256 _balance = IERC20(_token).balanceOf(address(this));
+
+    require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
+    pools[_token].tokenBalance = uint112(_balance);
+    pools[_token].price = uint112(_price);
+
+    _updateVusdBalance(_token, _vusdIn, _vusdOut);
+    
+  }
+
+  // view func to compute amount required for tokenIn to get fixed amount of tokenOut
+  function getAmountIn(address tokenIn, address tokenOut, 
+    uint256 amountOut) public view returns (uint256 tokenInPrice, uint256 tokenOutPrice, 
+    uint256 amountIn, uint256 tradeVusdValue) {
+    require(amountOut > 0, 'Monoswap: INSUFFICIENT_INPUT_AMOUNT');
+    
+    uint256 amountOutWithFee = amountOut.mul(1e5+fees)/1e5;
+    address vusdAddress = address(vUSD);
+
+    if(tokenOut==vusdAddress){
+      tradeVusdValue = amountOutWithFee;
+      tokenOutPrice = 1e18;
+    }else{
+      require (tokenPoolStatus[tokenOut]==1, "Monoswap: Token Not Found");
+      // PoolInfo memory tokenOutPool = pools[tokenOut];
+      PoolStatus tokenOutPoolStatus = pools[tokenOut].status;
+      uint tokenOutPoolPrice = pools[tokenOut].price;
+      uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
+      require (tokenOutPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
+      tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
+        amountOutWithFee, TxType.BUY);
+
+      tradeVusdValue = tokenOutPrice.mul(amountOutWithFee)/1e18;
+    }
+
+    if(tokenIn==vusdAddress){
+      amountIn = tradeVusdValue;
+      tokenInPrice = 1e18;
+    }else{
+      require (tokenPoolStatus[tokenIn]==1, "Monoswap: Token Not Found");
+      // PoolInfo memory tokenInPool = pools[tokenIn];
+      PoolStatus tokenInPoolStatus = pools[tokenIn].status;
+      uint tokenInPoolPrice = pools[tokenIn].price;
+      uint tokenInPoolTokenBalance = pools[tokenIn].tokenBalance;
+      require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
+      
+      uint256 preliminaryAmountIn = tradeVusdValue.mul(1e18).div(tokenInPoolPrice);
+      tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
+        preliminaryAmountIn, TxType.SELL);
+      amountIn = tradeVusdValue.mul(1e18).div(tokenInPrice);
+    }
+  }
+  
+  // swap from tokenIn to tokenOut with fixed tokenOut amount.
+  function swapOut (address tokenIn, address tokenOut, address to, 
+      uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
+
+    IvUSD vusdLocal = vUSD;
+
+    uint256 tokenInPrice;
+    uint256 tokenOutPrice;
+    uint256 tradeVusdValue;
+    (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
+
+    if(tokenStatus[tokenIn]==2){
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+    }else{
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
+    }
+
+    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
+
+    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
+
+    // trading in
+    if(tokenIn==address(vusdLocal)){
+      vusdLocal.burn(address(this), amountIn);
+      // all fees go to buy side
+      oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
+    }else{
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
+    }
+
+    // trading out
+    if(tokenOut==address(vusdLocal)){
+      vusdLocal.mint(to, amountOut);
+      // all fees go to sell side
+      _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
+    }else{
+      IERC20(tokenOut).safeTransfer(to, amountOut);
+      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
+    }
+
+    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
+
+    delete tokenInPrice;
+    delete tokenOutPrice;
+    delete tradeVusdValue;
+    delete oneSideFeesInVusd;
+  }
+
+  // view func to compute amount required for tokenOut to get fixed amount of tokenIn
   function getAmountOut(address tokenIn, address tokenOut, 
     uint256 amountIn) public view returns (uint256 tokenInPrice, uint256 tokenOutPrice, 
     uint256 amountOut, uint256 tradeVusdValue) {
@@ -363,205 +576,17 @@ contract Monoswap is ERC1155, Ownable {
     }
   }
 
-  function getAmountIn(address tokenIn, address tokenOut, 
-    uint256 amountOut) public view returns (uint256 tokenInPrice, uint256 tokenOutPrice, 
-    uint256 amountIn, uint256 tradeVusdValue) {
-    require(amountOut > 0, 'Monoswap: INSUFFICIENT_INPUT_AMOUNT');
-    
-    uint256 amountOutWithFee = amountOut.mul(1e5+fees)/1e5;
-    address vusdAddress = address(vUSD);
-
-    if(tokenOut==vusdAddress){
-      tradeVusdValue = amountOutWithFee;
-      tokenOutPrice = 1e18;
-    }else{
-      require (tokenPoolStatus[tokenOut]==1, "Monoswap: Token Not Found");
-      // PoolInfo memory tokenOutPool = pools[tokenOut];
-      PoolStatus tokenOutPoolStatus = pools[tokenOut].status;
-      uint tokenOutPoolPrice = pools[tokenOut].price;
-      uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
-      require (tokenOutPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
-      tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
-        amountOutWithFee, TxType.BUY);
-
-      tradeVusdValue = tokenOutPrice.mul(amountOutWithFee)/1e18;
-    }
-
-    if(tokenIn==vusdAddress){
-      amountIn = tradeVusdValue;
-      tokenInPrice = 1e18;
-    }else{
-      require (tokenPoolStatus[tokenIn]==1, "Monoswap: Token Not Found");
-      // PoolInfo memory tokenInPool = pools[tokenIn];
-      PoolStatus tokenInPoolStatus = pools[tokenIn].status;
-      uint tokenInPoolPrice = pools[tokenIn].price;
-      uint tokenInPoolTokenBalance = pools[tokenIn].tokenBalance;
-      require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
-      
-      uint256 preliminaryAmountIn = tradeVusdValue.mul(1e18).div(tokenInPoolPrice);
-      tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
-        preliminaryAmountIn, TxType.SELL);
-      amountIn = tradeVusdValue.mul(1e18).div(tokenInPrice);
-    }
-  }
-
-  function swapExactTokenForToken(
-    address tokenIn,
-    address tokenOut,
-    uint amountIn,
-    uint amountOutMin,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountOut) {
-    amountOut = swapIn(tokenIn, tokenOut, to, amountIn);
-    require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
-  }
-
-  function swapTokenForExactToken(
-    address tokenIn,
-    address tokenOut,
-    uint amountInMax,
-    uint amountOut,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountIn) {
-    amountIn = swapOut(tokenIn, tokenOut, to, amountOut);
-    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-  }
-
-  function vusdBalanceAdd (uint256 _credit, uint256 _debt, 
-    uint256 delta) public pure returns (uint256 _newCredit, uint256 _newDebt) {
-    if(_debt>0){
-      if(delta>_debt){
-        _newDebt = 0;
-        _newCredit = _credit.add(delta - _debt);
-      }else{
-        _newCredit = 0;
-        _newDebt = _debt - delta;
-      }
-    }else{
-      _newCredit = _credit.add(delta);
-      _newDebt = 0;
-    }
-  }
-
-  function vusdBalanceSub (uint256 _credit, uint256 _debt, 
-    uint256 delta) public pure returns (uint256 _newCredit, uint256 _newDebt) {
-    if(_credit>0){
-      if(delta>_credit){
-        _newCredit = 0;
-        _newDebt = delta - _credit;
-      }else{
-        _newCredit = _credit - delta;
-        _newDebt = 0;
-      }
-    }else{
-      _newCredit = 0;
-      _newDebt = _debt.add(delta);
-    }
-  } 
-
-  function _updateVusdBalance (address _token, 
-    uint _vusdIn, uint _vusdOut) internal returns (uint _vusdCredit, uint _vusdDebt) {
-    if(_vusdIn>_vusdOut){
-      _vusdIn = _vusdIn - _vusdOut;
-      _vusdOut = 0;
-    }else{
-      _vusdOut = _vusdOut - _vusdIn;
-      _vusdIn = 0;
-    }
-
-    // PoolInfo memory _pool = pools[_token];
-    uint _poolVusdCredit = pools[_token].vusdCredit;
-    uint _poolVusdDebt = pools[_token].vusdDebt;
-    PoolStatus _poolStatus = pools[_token].status;
-    
-    if(_vusdOut>0){
-      (_vusdCredit, _vusdDebt) = vusdBalanceSub(
-        _poolVusdCredit, _poolVusdDebt, _vusdOut);
-      pools[_token].vusdCredit = uint112(_vusdCredit);
-      pools[_token].vusdDebt = uint112(_vusdDebt);
-    }
-
-    if(_vusdIn>0){
-      (_vusdCredit, _vusdDebt) = vusdBalanceAdd(
-        _poolVusdCredit, _poolVusdDebt, _vusdIn);
-      pools[_token].vusdCredit = uint112(_vusdCredit);
-      pools[_token].vusdDebt = uint112(_vusdDebt);
-    }
-
-    if(_poolStatus == PoolStatus.LISTED){
-
-      require (_vusdCredit>=0 && _vusdDebt==0, "Monoswap: unofficial pool cannot bear debt");
-    }
-  }
-  
-  
-  function _updateTokenInfo (address _token, uint256 _price,
-      uint256 _vusdIn, uint256 _vusdOut) internal {
-    
-    pools[_token].price = uint112(_price);
-    pools[_token].tokenBalance = uint112(IERC20(_token).balanceOf(address(this)));
-
-    _updateVusdBalance(_token, _vusdIn, _vusdOut);
-    
-  }
-  
-  function swapOut (address tokenIn, address tokenOut, address to, 
-      uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
-
-    IvUSD vusdLocal = vUSD;
-
-    uint256 tokenInPrice;
-    uint256 tokenOutPrice;
-    uint256 tradeVusdValue;
-    (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
-
-    if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(to, address(this), amountIn);
-    }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(to, address(this), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
-      require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
-    }
-
-    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
-
-    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
-
-    // trading in
-    if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(this), amountIn);
-      // all fees go to buy side
-      oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
-    }else{
-      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
-    }
-
-    // trading out
-    if(tokenOut==address(vusdLocal)){
-      vusdLocal.mint(to, amountOut);
-      // all fees go to sell side
-      _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
-    }else{
-      IERC20(tokenOut).safeTransfer(to, amountOut);
-      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
-    }
-
-    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
-  }
-
+  // swap from tokenIn to tokenOut with fixed tokenIn amount.
   function swapIn (address tokenIn, address tokenOut, address to,
       uint256 amountIn) public lockToken(tokenIn) returns(uint256 amountOut)  {
 
     IvUSD vusdLocal = vUSD;
 
     if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(to, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
     }else{
       uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(to, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
       uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
       amountIn = balanceIn1.sub(balanceIn0);
     }
@@ -594,7 +619,10 @@ contract Monoswap is ERC1155, Ownable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
     
-    
+    delete tokenInPrice;
+    delete tokenOutPrice;
+    delete tradeVusdValue;
+    delete oneSideFeesInVusd;
   }
   
   
