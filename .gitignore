@@ -1,6 +1,6 @@
 /node_modules/
 /build/
 /cache/
-
+/coverage
 .openzeppelin/.session
 .env
