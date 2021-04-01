@@ -1,6 +1,8 @@
 /node_modules/
 /build/
 /cache/
-
+/coverage
 .openzeppelin/.session
 .env
+artifacts/@openzeppelin
+artifacts/build-info
