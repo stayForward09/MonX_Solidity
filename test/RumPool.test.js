@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, assert } = require("hardhat");
 const { expect } = require("chai");
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
 
@@ -207,8 +207,7 @@ describe('OptionVaultPair', function () {
 
         const yfiAlice1 = smallNum((await this.yfi.balanceOf(this.alice.address)).toString())
         const daiAlice1 = smallNum((await this.dai.balanceOf(this.alice.address)).toString())
-
-        expect(yfiAlice1-yfiAlice0).to.equalTo(1)
+        expect((yfiAlice1-yfiAlice0).toPrecision(1)).to.equal('1')
         expect(daiAlice0-daiAlice1).to.greaterThan(20000)
         expect(daiAlice0-daiAlice1).to.lessThan(22000)
 
