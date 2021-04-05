@@ -2,6 +2,7 @@ const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const Monoswap = artifacts.require('Monoswap');
 const MockERC20 = artifacts.require('MockERC20');
 const vUSD = artifacts.require('VUSD');
+const MonoswapToken = artifacts.require('MonoswapToken');
 
 const e18 = 1 + '0'.repeat(18)
 const e26 = 1 + '0'.repeat(26)
@@ -24,9 +25,10 @@ contract('OptionVaultPair', ([alice, bob, minter, dev]) => {
         await this.weth.transfer(bob, bigNum(10000000), {from: minter})
         await this.yfi.transfer(bob, bigNum(10000000), {from: minter})
         await this.dai.transfer(bob, bigNum(10000000), {from: minter})
-
-        this.pool = await Monoswap.new(this.vusd.address, {from: minter})
+        this.monoswapToken = await MonoswapToken.new({from: minter})
+        this.pool = await Monoswap.new(this.monoswapToken.address, this.vusd.address, {from: minter})
         this.vusd.transferOwnership(this.pool.address, {from: minter})
+        this.monoswapToken.transferOwnership(this.pool.address, {from: minter})
         this.pool.setFeeTo(dev, {from: minter})
 
         const timestamp = (await time.latest()) + 10000;
@@ -136,8 +138,7 @@ contract('OptionVaultPair', ([alice, bob, minter, dev]) => {
             this.dai.address, this.weth.address, 
             bigNum(15000), bigNum(45), bob, deadline,
             {from: bob})
-
-        const liquidity = (await this.pool.balanceOf(alice, 0)).toString()
+        const liquidity = (await this.monoswapToken.balanceOf(alice, 0)).toString()
 
         console.log('liquidity', liquidity);
 
@@ -165,8 +166,7 @@ contract('OptionVaultPair', ([alice, bob, minter, dev]) => {
 
         await this.pool.addLiquidity(this.weth.address, 
             bigNum(1000000), bob, {from: bob});
-
-        const liquidity = (await this.pool.balanceOf(alice, 0)).toString()
+        const liquidity = (await this.monoswapToken.balanceOf(alice, 0)).toString()
 
         console.log('liquidity', liquidity);
 
