@@ -79,30 +79,28 @@ describe('OptionVaultPair', function () {
         
     });
 
-    // it('should purchase and sell ERC-20 successfully', async () => {
+    it('should purchase and sell ERC-20 successfully', async function () {
 
-    //     const deadline = (await time.latest()) + 10000
+        const deadline = (await time.latest()) + 10000
 
-    //     await this.pool.swapExactTokenForToken(
-    //         this.weth.address, this.dai.address, 
-    //         bigNum(2), bigNum(400),  this.bob, deadline, {from:  this.bob})
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            bigNum(2), bigNum(400), this.bob.address, deadline)
 
-    //     const daiAmount = await this.dai.balanceOf( this.bob)
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
 
-    //     const ethPool = await this.pool.pools(this.weth.address);
+        const ethPool = await this.pool.pools(this.weth.address);
 
-    //     const daiPool = await this.pool.pools(this.dai.address);
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
 
-    //     assert.isBelow(smallNum(daiAmount.toString())-10000000, 600)
-    //     assert.isAbove(smallNum(daiAmount.toString())-10000000, 550)
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
 
-    //     assert.isAbove(smallNum(daiPool.price.toString()), 1)
-    //     assert.isBelow(smallNum(daiPool.price.toString()), 2)
-
-    //     assert.isAbove(smallNum(ethPool.price.toString()), 200)
-    //     assert.isBelow(smallNum(ethPool.price.toString()), 300)
-        
-    // });
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
 
     // it('should purchase and sell vUSD successfully', async () => {
 
