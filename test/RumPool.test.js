@@ -102,129 +102,123 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
     });
 
-    // it('should purchase and sell vUSD successfully', async () => {
+    it('should purchase and sell vUSD successfully', async function () {
 
-    //     const deadline = (await time.latest()) + 10000
+        const deadline = (await time.latest()) + 10000
 
-    //     await this.pool.swapExactTokenForToken(
-    //         this.weth.address, this.vusd.address, 
-    //         bigNum(20), bigNum(4000),  this.bob, deadline,
-    //         {from:  this.bob})
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.vusd.address, 
+            bigNum(20), bigNum(4000),  this.bob.address, deadline)
 
-    //     let vusdbob0 = smallNum((await this.vusd.balanceOf( this.bob)).toString())
+        let vusdbob0 = smallNum((await this.vusd.balanceOf(this.bob.address)).toString())
 
-    //     assert.isBelow(vusdbob0, 6000)
-    //     assert.isAbove(vusdbob0, 5500)
-
-    //     let ethPool = await this.pool.pools(this.weth.address)
-    //     let ethPrice0 = smallNum(ethPool.price.toString())
-
-    //     assert.isAbove(ethPrice0, 200)
-    //     assert.isBelow(ethPrice0, 300)
-
-    //     console.log('ETH price', ethPrice0)
-
-    //     await this.pool.swapTokenForExactToken(
-    //         this.vusd.address, this.weth.address, 
-    //         bigNum(3500), bigNum(10),  this.bob, deadline,
-    //         {from:  this.bob})
-
-    //     let vusdbob1 = smallNum((await this.vusd.balanceOf( this.bob)).toString())
-
-    //     assert.isBelow(vusdbob0-vusdbob1, 3020)
-    //     assert.isAbove(vusdbob0-vusdbob1, 3000)
-
-    //     ethPool = await this.pool.pools(this.weth.address)
-    //     const ethPrice1 = smallNum(ethPool.price.toString())
-    //     console.log('ETH price', ethPrice1)
-    //     assert.isBelow(ethPrice0, ethPrice1)
+        expect(vusdbob0).to.greaterThan(5500)
+        expect(vusdbob0).to.lessThan(6000)
         
-    // });
+        let ethPool = await this.pool.pools(this.weth.address)
+        let ethPrice0 = smallNum(ethPool.price.toString())
 
-    // it('should remove liquidity successfully', async () => {
+        expect(ethPrice0).to.greaterThan(200)
+        expect(ethPrice0).to.lessThan(300)
 
-    //     const deadline = (await time.latest()) + 10000
+        // console.log('ETH price', ethPrice0)
 
-    //     await this.pool.swapExactTokenForToken(
-    //         this.dai.address, this.weth.address, 
-    //         bigNum(15000), bigNum(45),  this.bob, deadline,
-    //         {from:  this.bob})
-    //     const liquidity = (await this.monoswapToken.balanceOf(this.alice, 0)).toString()
+        await this.pool.connect(this.bob).swapTokenForExactToken(
+            this.vusd.address, this.weth.address, 
+            bigNum(3500), bigNum(10),  this.bob.address, deadline)
 
-    //     console.log('liquidity', liquidity);
+        let vusdbob1 = smallNum((await this.vusd.balanceOf( this.bob.address)).toString())
 
-    //     const results = await this.pool.removeLiquidity(
-    //         this.weth.address, liquidity, this.this.alice, 0, 0, {from: this.this.alice});
+        expect(vusdbob0-vusdbob1).to.greaterThan(3000)
+        expect(vusdbob0-vusdbob1).to.lessThan(3020)
 
-    //     let vusdAmount = await this.vusd.balanceOf(this.alice)
+        ethPool = await this.pool.pools(this.weth.address)
+        const ethPrice1 = smallNum(ethPool.price.toString())
+        // console.log('ETH price', ethPrice1)
+        expect(ethPrice0).to.lessThan(ethPrice1)
+    });
 
-    //     assert.isBelow(smallNum(vusdAmount.toString()), 50*300)
-    //     assert.isAbove(smallNum(vusdAmount.toString()), 50*250)
+    it('should remove liquidity successfully', async function () {
 
-    //     let devFee = await this.vusd.balanceOf(this.dev)
-    //     console.log(smallNum(devFee.toString()))
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.dai.address, this.weth.address, 
+            bigNum(15000), bigNum(45),  this.bob.address, deadline)
+        const liquidity = (await this.monoswapToken.balanceOf(this.alice.address, 0)).toString()
+
+        console.log('liquidity', liquidity);
+
+        const results = await this.pool.connect(this.alice).removeLiquidity(
+            this.weth.address, liquidity, this.alice.address, 0, 0);
+
+        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+
+        expect(smallNum(vusdAmount.toString())).to.greaterThan(50*250)
+        expect(smallNum(vusdAmount.toString())).to.lessThan(50*300)
+
+        let devFee = await this.vusd.balanceOf(this.dev.address)
+        console.log(smallNum(devFee.toString()))
+    });
+
+    it('should add and remove liquidity successfully', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.dai.address, this.weth.address, 
+            bigNum(15000), bigNum(45),  this.bob.address, deadline)
+
+        await this.pool.connect(this.bob).addLiquidity(this.weth.address, 
+            bigNum(1000000),  this.bob.address);
+        const liquidity = (await this.monoswapToken.balanceOf(this.alice.address, 0)).toString()
+
+        console.log('liquidity', liquidity);
+
+        const results = await this.pool.connect(this.alice).removeLiquidity(
+            this.weth.address, liquidity, this.alice.address, 0, 0);
+
+        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+
+        expect(smallNum(vusdAmount.toString())).to.greaterThan(50*250/2)
+        expect(smallNum(vusdAmount.toString())).to.lessThan(50*300/2)
+
+        let devFee = await this.vusd.balanceOf(this.dev.address)
+        console.log(smallNum(devFee.toString()))
+    });
+
+    it('should list new tokens successfully', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).listNewToken(
+            this.yfi.address, bigNum(20000), 
+            0, bigNum(20),  this.bob.address)
+
+        const yfiAlice0 = smallNum((await this.yfi.balanceOf(this.alice.address)).toString())
+        const daiAlice0 = smallNum((await this.dai.balanceOf(this.alice.address)).toString())
+
+        let yfiPool = await this.pool.pools(this.yfi.address)
+        const yfiPrice0 = smallNum(yfiPool.price.toString())
+
+        await this.pool.connect(this.alice).swapTokenForExactToken(
+            this.dai.address, this.yfi.address, 
+            bigNum(30000), bigNum(1), this.alice.address, deadline)
+
+        const yfiAlice1 = smallNum((await this.yfi.balanceOf(this.alice.address)).toString())
+        const daiAlice1 = smallNum((await this.dai.balanceOf(this.alice.address)).toString())
+
+        expect(yfiAlice1-yfiAlice0).to.equalTo(1)
+        expect(daiAlice0-daiAlice1).to.greaterThan(20000)
+        expect(daiAlice0-daiAlice1).to.lessThan(22000)
+
+        yfiPool = await this.pool.pools(this.yfi.address)
+        const yfiPrice1 = smallNum(yfiPool.price.toString())
+
+        assert.isAbove(yfiPrice1, yfiPrice0)
+        expect(yfiPrice1).to.greaterThan(yfiPrice0)
+        console.log('yfi', yfiPrice1, yfiPrice0)
         
-    // });
-
-    // it('should add and remove liquidity successfully', async () => {
-
-    //     const deadline = (await time.latest()) + 10000
-
-    //     await this.pool.swapExactTokenForToken(
-    //         this.dai.address, this.weth.address, 
-    //         bigNum(15000), bigNum(45),  this.bob, deadline,
-    //         {from:  this.bob})
-
-    //     await this.pool.addLiquidity(this.weth.address, 
-    //         bigNum(1000000),  this.bob, {from:  this.bob});
-    //     const liquidity = (await this.monoswapToken.balanceOf(this.alice, 0)).toString()
-
-    //     console.log('liquidity', liquidity);
-
-    //     const results = await this.pool.removeLiquidity(
-    //         this.weth.address, liquidity, this.this.alice, 0, 0, {from: this.this.alice});
-
-    //     let vusdAmount = await this.vusd.balanceOf(this.alice)
-
-    //     assert.isBelow(smallNum(vusdAmount.toString()), 50*300/2)
-    //     assert.isAbove(smallNum(vusdAmount.toString()), 50*250/2)
-
-    //     let devFee = await this.vusd.balanceOf(this.dev)
-    //     console.log(smallNum(devFee.toString()))
-        
-    // });
-
-    // it('should list new tokens successfully', async () => {
-
-    //     const deadline = (await time.latest()) + 10000
-
-    //     await this.pool.listNewToken(
-    //         this.yfi.address, bigNum(20000), 
-    //         0, bigNum(20),  this.bob, {from:  this.bob})
-
-    //     const yfiAlice0 = smallNum((await this.yfi.balanceOf(this.alice)).toString())
-    //     const daiAlice0 = smallNum((await this.dai.balanceOf(this.alice)).toString())
-
-    //     let yfiPool = await this.pool.pools(this.yfi.address)
-    //     const yfiPrice0 = smallNum(yfiPool.price.toString())
-
-    //     await this.pool.swapTokenForExactToken(
-    //         this.dai.address, this.yfi.address, 
-    //         bigNum(30000), bigNum(1), this.this.alice, deadline,
-    //         {from: this.this.alice})
-
-    //     const yfiAlice1 = smallNum((await this.yfi.balanceOf(this.alice)).toString())
-    //     const daiAlice1 = smallNum((await this.dai.balanceOf(this.alice)).toString())
-    //     assert.equal(yfiAlice1-yfiAlice0, 1)
-    //     assert.isBelow(daiAlice0-daiAlice1, 22000)
-    //     assert.isAbove(daiAlice0-daiAlice1, 20000)
-
-    //     yfiPool = await this.pool.pools(this.yfi.address)
-    //     const yfiPrice1 = smallNum(yfiPool.price.toString())
-
-    //     assert.isAbove(yfiPrice1, yfiPrice0)
-    //     console.log('yfi', yfiPrice1, yfiPrice0)
-        
-    // });
+    });
 
 });
