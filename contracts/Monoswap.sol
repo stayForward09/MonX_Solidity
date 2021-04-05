@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-// import "@openzeppelin/contracts/math/Math.sol";
-// import "@nomiclabs/buidler/console.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "./MonoswapToken.sol";
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -18,7 +18,7 @@ interface IvUSD is IERC20 {
 /**
  * The Monoswap is ERC1155 contract does this and that...
  */
-contract Monoswap is ERC1155, Ownable {
+contract Monoswap is Ownable, Initializable {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for IvUSD;
@@ -103,10 +103,18 @@ contract Monoswap is ERC1155, Ownable {
     uint amountIn,
     uint amountOut
   );
-  
-  constructor(IvUSD _vusd) public ERC1155("{1}") {
+
+  MonoswapToken public monoswapToken;
+
+  // function initialize(MonoswapToken _monoswapToken, IvUSD _vusd) public initializer {
+  //   monoswapToken = _monoswapToken;
+  //   vUSD = _vusd;
+  // }  
+
+  constructor (MonoswapToken _monoswapToken, IvUSD _vusd) public {
+    monoswapToken = _monoswapToken;
     vUSD = _vusd;
-  }
+  }  
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -126,12 +134,12 @@ contract Monoswap is ERC1155, Ownable {
 
   function mint (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].add(amount);
-    _mint(account, id, amount, "");
+    monoswapToken.mint(account, id, amount);
   }
 
   function burn (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].sub(amount);
-    _burn(account, id, amount);
+    monoswapToken.burn(account, id, amount);
   }
 
   // creates a pool
@@ -168,7 +176,7 @@ contract Monoswap is ERC1155, Ownable {
 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      mint(feeTo, pid, devLiquidity);
+      monoswapToken.mint(feeTo, pid, devLiquidity);
     }
 
   }
@@ -265,7 +273,7 @@ contract Monoswap is ERC1155, Ownable {
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = totalSupply[pool.pid];
 
-    liquidityIn = balanceOf(to, pool.pid)>liquidity?liquidity:balanceOf(to, pool.pid);
+    liquidityIn = monoswapToken.balanceOf(to, pool.pid)>liquidity?liquidity:monoswapToken.balanceOf(to, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
     
     if(tokenReserve < pool.tokenBalance){
@@ -624,6 +632,4 @@ contract Monoswap is ERC1155, Ownable {
     delete tradeVusdValue;
     delete oneSideFeesInVusd;
   }
-  
-  
 }
