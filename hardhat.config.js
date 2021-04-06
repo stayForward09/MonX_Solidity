@@ -1,5 +1,7 @@
 require("@nomiclabs/hardhat-truffle5");
-// require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-ethers");
+require('@openzeppelin/hardhat-upgrades');
+require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-web3");
 require("dotenv/config")
 // require("@nomiclabs/hardhat-etherscan");
@@ -24,7 +26,7 @@ task("accounts", "Prints the list of accounts", async () => {
  */
 module.exports = {
   solidity: {
-    version: "0.6.12",
+    version: "0.7.6",
     settings: {
       optimizer: {
         enabled: true,

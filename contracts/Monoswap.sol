@@ -1,12 +1,13 @@
-pragma solidity 0.6.12;
+pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+// import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-// import "@openzeppelin/contracts/math/Math.sol";
-// import "@nomiclabs/buidler/console.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "./MonoXPool.sol";
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -18,18 +19,18 @@ interface IvUSD is IERC20 {
 /**
  * The Monoswap is ERC1155 contract does this and that...
  */
-contract Monoswap is ERC1155, Ownable {
+contract Monoswap is Initializable, OwnableUpgradeable {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for IvUSD;
 
   IvUSD vUSD;
   address feeTo;
-  uint16 fees=300; // over 1e5, so 300 means 0.3%
-  uint16 devFee = 50; // over 1e5, so 50 means 0.05%
+  uint16 fees; // over 1e5, 300 means 0.3%
+  uint16 devFee; // over 1e5, 50 means 0.05%
 
   mapping (uint256 => uint256) public totalSupply;
-  uint256 MINIMUM_LIQUIDITY=1e3;
+  uint256 constant MINIMUM_LIQUIDITY=1e3;
 
   struct PoolInfo {
     uint256 pid;
@@ -57,9 +58,9 @@ contract Monoswap is ERC1155, Ownable {
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
   mapping (address => uint8) public tokenPoolStatus; //0=undefined, 1=exists
 
-  uint256 public poolSize=0;
+  uint256 public poolSize;
 
-  uint private unlocked = 1;
+  uint private unlocked;
   modifier lock() {
     require(unlocked == 1, 'Monoswap: LOCKED');
     unlocked = 0;
@@ -103,10 +104,18 @@ contract Monoswap is ERC1155, Ownable {
     uint amountIn,
     uint amountOut
   );
-  
-  constructor(IvUSD _vusd) public ERC1155("{1}") {
+
+  MonoXPool public monoXPool;
+
+  function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
+    OwnableUpgradeable.__Ownable_init();
+    monoXPool = _monoXPool;
     vUSD = _vusd;
-  }
+    fees = 300;
+    devFee = 50;
+    poolSize = 0;
+    unlocked = 1;
+  }  
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -126,12 +135,12 @@ contract Monoswap is ERC1155, Ownable {
 
   function mint (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].add(amount);
-    _mint(account, id, amount, "");
+    monoXPool.mint(account, id, amount);
   }
 
   function burn (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].sub(amount);
-    _burn(account, id, amount);
+    monoXPool.burn(account, id, amount);
   }
 
   // creates a pool
@@ -168,7 +177,7 @@ contract Monoswap is ERC1155, Ownable {
 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      mint(feeTo, pid, devLiquidity);
+      monoXPool.mint(feeTo, pid, devLiquidity);
     }
 
   }
@@ -265,7 +274,7 @@ contract Monoswap is ERC1155, Ownable {
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = totalSupply[pool.pid];
 
-    liquidityIn = balanceOf(to, pool.pid)>liquidity?liquidity:balanceOf(to, pool.pid);
+    liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
     
     if(tokenReserve < pool.tokenBalance){
@@ -624,6 +633,8 @@ contract Monoswap is ERC1155, Ownable {
     delete tradeVusdValue;
     delete oneSideFeesInVusd;
   }
-  
-  
+
+  function balanceOf(address account, uint256 id) public view returns (uint256) {
+    return monoXPool.balanceOf(account, id);
+  }
 }
