@@ -1,11 +1,12 @@
 pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+// import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./MonoswapToken.sol";
 
 interface IvUSD is IERC20 {
@@ -18,18 +19,18 @@ interface IvUSD is IERC20 {
 /**
  * The Monoswap is ERC1155 contract does this and that...
  */
-contract Monoswap is Ownable, Initializable {
+contract Monoswap is Initializable, OwnableUpgradeable {
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
   using SafeERC20 for IvUSD;
 
   IvUSD vUSD;
   address feeTo;
-  uint16 fees=300; // over 1e5, so 300 means 0.3%
-  uint16 devFee = 50; // over 1e5, so 50 means 0.05%
+  uint16 fees; // over 1e5, 300 means 0.3%
+  uint16 devFee; // over 1e5, 50 means 0.05%
 
   mapping (uint256 => uint256) public totalSupply;
-  uint256 MINIMUM_LIQUIDITY=1e3;
+  uint256 constant MINIMUM_LIQUIDITY=1e3;
 
   struct PoolInfo {
     uint256 pid;
@@ -57,9 +58,9 @@ contract Monoswap is Ownable, Initializable {
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
   mapping (address => uint8) public tokenPoolStatus; //0=undefined, 1=exists
 
-  uint256 public poolSize=0;
+  uint256 public poolSize;
 
-  uint private unlocked = 1;
+  uint private unlocked;
   modifier lock() {
     require(unlocked == 1, 'Monoswap: LOCKED');
     unlocked = 0;
@@ -106,14 +107,14 @@ contract Monoswap is Ownable, Initializable {
 
   MonoswapToken public monoswapToken;
 
-  // function initialize(MonoswapToken _monoswapToken, IvUSD _vusd) public initializer {
-  //   monoswapToken = _monoswapToken;
-  //   vUSD = _vusd;
-  // }  
-
-  constructor (MonoswapToken _monoswapToken, IvUSD _vusd) public {
+  function initialize(MonoswapToken _monoswapToken, IvUSD _vusd) public initializer {
+    OwnableUpgradeable.__Ownable_init();
     monoswapToken = _monoswapToken;
     vUSD = _vusd;
+    fees = 300;
+    devFee = 50;
+    poolSize = 0;
+    unlocked = 1;
   }  
 
   function setFeeTo (address _feeTo) onlyOwner external {

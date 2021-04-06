@@ -1,0 +1,199 @@
+{
+  "manifestVersion": "3.1",
+  "impls": {
+    "8a406e385e6e57f01730acd7a86587d48aea9c17b96e8d11021356917d74b614": {
+      "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+      "txHash": "0x8e1dd9d802054b248142877906ebd4b4410128e931aefe9b4267eae872fab1b0",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:25"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol:30"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:31"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "_owner",
+            "type": "t_address",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:20"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:74"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "vUSD",
+            "type": "t_contract(IvUSD)3370",
+            "src": "contracts/Monoswap.sol:27"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "feeTo",
+            "type": "t_address",
+            "src": "contracts/Monoswap.sol:28"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "fees",
+            "type": "t_uint16",
+            "src": "contracts/Monoswap.sol:29"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "devFee",
+            "type": "t_uint16",
+            "src": "contracts/Monoswap.sol:30"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "totalSupply",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "src": "contracts/Monoswap.sol:32"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "pools",
+            "type": "t_mapping(t_address,t_struct(PoolInfo)3416_storage)",
+            "src": "contracts/Monoswap.sol:57"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "tokenStatus",
+            "type": "t_mapping(t_address,t_uint8)",
+            "src": "contracts/Monoswap.sol:58"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "tokenPoolStatus",
+            "type": "t_mapping(t_address,t_uint8)",
+            "src": "contracts/Monoswap.sol:59"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "poolSize",
+            "type": "t_uint256",
+            "src": "contracts/Monoswap.sol:61"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "unlocked",
+            "type": "t_uint256",
+            "src": "contracts/Monoswap.sol:63"
+          },
+          {
+            "contract": "Monoswap",
+            "label": "monoswapToken",
+            "type": "t_contract(MonoswapToken)5834",
+            "src": "contracts/Monoswap.sol:108"
+          }
+        ],
+        "types": {
+          "t_contract(IvUSD)3370": {
+            "label": "contract IvUSD"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_uint16": {
+            "label": "uint16"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)"
+          },
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_mapping(t_address,t_struct(PoolInfo)3416_storage)": {
+            "label": "mapping(address => struct Monoswap.PoolInfo)"
+          },
+          "t_struct(PoolInfo)3416_storage": {
+            "label": "struct Monoswap.PoolInfo",
+            "members": [
+              {
+                "label": "pid",
+                "type": "t_uint256"
+              },
+              {
+                "label": "lastPoolValue",
+                "type": "t_uint256"
+              },
+              {
+                "label": "token",
+                "type": "t_address"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(PoolStatus)3423"
+              },
+              {
+                "label": "vusdDebt",
+                "type": "t_uint112"
+              },
+              {
+                "label": "vusdCredit",
+                "type": "t_uint112"
+              },
+              {
+                "label": "tokenBalance",
+                "type": "t_uint112"
+              },
+              {
+                "label": "price",
+                "type": "t_uint112"
+              }
+            ]
+          },
+          "t_enum(PoolStatus)3423": {
+            "label": "enum Monoswap.PoolStatus",
+            "members": [
+              "UNLISTED",
+              "LISTED",
+              "OFFICIAL"
+            ]
+          },
+          "t_uint112": {
+            "label": "uint112"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)"
+          },
+          "t_uint8": {
+            "label": "uint8"
+          },
+          "t_contract(MonoswapToken)5834": {
+            "label": "contract MonoswapToken"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          },
+          "t_bool": {
+            "label": "bool"
+          }
+        }
+      }
+    }
+  },
+  "admin": {
+    "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+    "txHash": "0x9f44d64affa7f41ac34ddb026736fd972b1ea44c40ef1030e3f6d9babbae2b32"
+  }
+}

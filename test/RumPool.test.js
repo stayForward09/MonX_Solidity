@@ -1,4 +1,4 @@
-const { ethers, assert } = require("hardhat");
+const { ethers, assert, upgrades } = require("hardhat");
 const { expect } = require("chai");
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
 
@@ -38,8 +38,8 @@ describe('OptionVaultPair', function () {
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
         this.monoswapToken = await this.MonoswapToken.deploy()
-        this.pool = await this.Monoswap.deploy(this.monoswapToken.address, this.vusd.address)
-        // this.pool = await deployProxy(Monoswap, [this.monoswapToken.address, this.vusd.address])
+        // this.pool = await this.Monoswap.deploy(this.monoswapToken.address, this.vusd.address)
+        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoswapToken.address, this.vusd.address])
         this.vusd.transferOwnership(this.pool.address)
         this.monoswapToken.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
