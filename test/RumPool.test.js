@@ -21,7 +21,7 @@ describe('OptionVaultPair', function () {
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
         this.vUSD = await ethers.getContractFactory('VUSD');
-        this.MonoswapToken = await ethers.getContractFactory('MonoswapToken');
+        this.MonoXPool = await ethers.getContractFactory('MonoXPool');
     })
     
     beforeEach(async function () {
@@ -37,11 +37,11 @@ describe('OptionVaultPair', function () {
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
-        this.monoswapToken = await this.MonoswapToken.deploy()
-        // this.pool = await this.Monoswap.deploy(this.monoswapToken.address, this.vusd.address)
-        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoswapToken.address, this.vusd.address])
+        this.monoXPool = await this.MonoXPool.deploy()
+        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address)
+        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address])
         this.vusd.transferOwnership(this.pool.address)
-        this.monoswapToken.transferOwnership(this.pool.address)
+        this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
 
         const timestamp = (await time.latest()) + 10000;
@@ -145,7 +145,7 @@ describe('OptionVaultPair', function () {
         await this.pool.connect(this.bob).swapExactTokenForToken(
             this.dai.address, this.weth.address, 
             bigNum(15000), bigNum(45),  this.bob.address, deadline)
-        const liquidity = (await this.monoswapToken.balanceOf(this.alice.address, 0)).toString()
+        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
 
         console.log('liquidity', liquidity);
 
@@ -171,7 +171,7 @@ describe('OptionVaultPair', function () {
 
         await this.pool.connect(this.bob).addLiquidity(this.weth.address, 
             bigNum(1000000),  this.bob.address);
-        const liquidity = (await this.monoswapToken.balanceOf(this.alice.address, 0)).toString()
+        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
 
         console.log('liquidity', liquidity);
 

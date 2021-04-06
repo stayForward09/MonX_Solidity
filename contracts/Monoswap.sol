@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./MonoswapToken.sol";
+import "./MonoXPool.sol";
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -105,11 +105,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint amountOut
   );
 
-  MonoswapToken public monoswapToken;
+  MonoXPool public monoXPool;
 
-  function initialize(MonoswapToken _monoswapToken, IvUSD _vusd) public initializer {
+  function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
-    monoswapToken = _monoswapToken;
+    monoXPool = _monoXPool;
     vUSD = _vusd;
     fees = 300;
     devFee = 50;
@@ -135,12 +135,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   function mint (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].add(amount);
-    monoswapToken.mint(account, id, amount);
+    monoXPool.mint(account, id, amount);
   }
 
   function burn (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].sub(amount);
-    monoswapToken.burn(account, id, amount);
+    monoXPool.burn(account, id, amount);
   }
 
   // creates a pool
@@ -177,7 +177,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      monoswapToken.mint(feeTo, pid, devLiquidity);
+      monoXPool.mint(feeTo, pid, devLiquidity);
     }
 
   }
@@ -274,7 +274,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = totalSupply[pool.pid];
 
-    liquidityIn = monoswapToken.balanceOf(to, pool.pid)>liquidity?liquidity:monoswapToken.balanceOf(to, pool.pid);
+    liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
     
     if(tokenReserve < pool.tokenBalance){
@@ -632,5 +632,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     delete tokenOutPrice;
     delete tradeVusdValue;
     delete oneSideFeesInVusd;
+  }
+
+  function balanceOf(address account, uint256 id) public view returns (uint256) {
+    return monoXPool.balanceOf(account, id);
   }
 }
