@@ -9,6 +9,11 @@ const e24 = 1 + '0'.repeat(24)
 
 const bigNum = num=>(num + '0'.repeat(18))
 const smallNum = num=>(parseInt(num)/bigNum(1))
+const PoolStatus = {
+    UNLISTED: 0,
+    LISTED: 1,
+    OFFICIAL: 2
+}
 
 describe('OptionVaultPair', function () {
     before(async function () {
@@ -214,10 +219,16 @@ describe('OptionVaultPair', function () {
         yfiPool = await this.pool.pools(this.yfi.address)
         const yfiPrice1 = smallNum(yfiPool.price.toString())
 
-        assert.isAbove(yfiPrice1, yfiPrice0)
         expect(yfiPrice1).to.greaterThan(yfiPrice0)
         console.log('yfi', yfiPrice1, yfiPrice0)
         
+    });
+
+    it('update pool status successfully', async function () {
+        await this.pool.updatePoolStatus(this.weth.address, PoolStatus.LISTED) 
+        expect((await this.pool.pools(this.weth.address)).status).to.equal(PoolStatus.LISTED)
+        await this.pool.updatePoolStatus(this.dai.address, PoolStatus.UNLISTED) 
+        expect((await this.pool.pools(this.dai.address)).status).to.equal(PoolStatus.UNLISTED)
     });
 
 });

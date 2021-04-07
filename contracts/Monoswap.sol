@@ -132,7 +132,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // TODO: update status of a pool. onlyOwner.
-
+  function updatePoolStatus(address _token, PoolStatus _status) public onlyOwner {
+    PoolInfo storage pool = pools[_token];
+    pool.status = _status;
+  }
   function mint (address account, uint256 id, uint256 amount) internal {
     totalSupply[id]=totalSupply[id].add(amount);
     monoXPool.mint(account, id, amount);
