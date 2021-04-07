@@ -226,9 +226,12 @@ describe('OptionVaultPair', function () {
 
     it('update pool status successfully', async function () {
         await this.pool.updatePoolStatus(this.weth.address, PoolStatus.LISTED) 
-        expect((await this.pool.pools(this.weth.address)).status).to.equal(PoolStatus.LISTED)
+        let ethPool = await this.pool.pools(this.weth.address)
+        expect(ethPool.status).to.equal(PoolStatus.LISTED)
+
         await this.pool.updatePoolStatus(this.dai.address, PoolStatus.UNLISTED) 
-        expect((await this.pool.pools(this.dai.address)).status).to.equal(PoolStatus.UNLISTED)
+        let daiPool = await this.pool.pools(this.dai.address)
+        expect(daiPool.status).to.equal(PoolStatus.UNLISTED)
     });
 
 });
