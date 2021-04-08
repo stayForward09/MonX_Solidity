@@ -6,3 +6,8 @@
 .env
 artifacts/@openzeppelin
 artifacts/build-info
+artifacts/contracts/MockERC20.sol/MockERC20.dbg.json
+artifacts/contracts/MonoXPool.sol/MonoXPool.dbg.json
+artifacts/contracts/Monoswap.sol/IvUSD.dbg.json
+artifacts/contracts/Monoswap.sol/Monoswap.dbg.json
+artifacts/contracts/VUSD.sol/VUSD.dbg.json
