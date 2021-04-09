@@ -655,15 +655,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     IvUSD vusdLocal = vUSD;
 
-    if (tokenIn != VETH) {
-      if(tokenStatus[tokenIn]==2){
-        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-      }else{
-        uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-        IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-        uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
-        amountIn = balanceIn1.sub(balanceIn0);
-      }
+    if(tokenStatus[tokenIn]==2){
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+    }else{
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      amountIn = balanceIn1.sub(balanceIn0);
     }
 
     uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
@@ -672,7 +670,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenOutPrice;
     uint256 tradeVusdValue;
     
-    (tokenInPrice, tokenOutPrice, amountOut, tradeVusdValue) = getAmountOut(tokenIn != VETH ? tokenIn : WETH, tokenOut, amountIn);
+    (tokenInPrice, tokenOutPrice, amountOut, tradeVusdValue) = getAmountOut(tokenIn, tokenOut, amountIn);
 
     uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
 
@@ -682,7 +680,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to the other side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
-      _updateTokenInfo(tokenIn != VETH ? tokenIn : WETH, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
     }
 
     // trading out
