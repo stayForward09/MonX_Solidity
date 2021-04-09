@@ -15,6 +15,10 @@ const PoolStatus = {
     OFFICIAL: 2
 }
 
+const overrides = {
+    gasLimit: 9500000
+}
+
 describe('OptionVaultPair', function () {
     before(async function () {
         this.signers = await ethers.getSigners()
@@ -25,16 +29,19 @@ describe('OptionVaultPair', function () {
         this.minter = this.signers[4]
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
+        this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vUSD = await ethers.getContractFactory('VUSD');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
     })
     
     beforeEach(async function () {
-        this.weth = await this.MockERC20.deploy('WETH', 'WETH', e26);
+        this.weth = await this.WETH9.deploy();
         this.yfi = await this.MockERC20.deploy('YFI', 'YFI', e26);
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
         this.vusd = await this.vUSD.deploy();
 
+        await this.weth.deposit({value: bigNum(20000000)})
+        // console.log(this.weth.totalSupply())
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
@@ -43,8 +50,8 @@ describe('OptionVaultPair', function () {
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
         this.monoXPool = await this.MonoXPool.deploy()
-        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address)
-        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address])
+        // this.pool = await; this.Monoswap.deploy(this.monoXPool.address, this.vusd.address)
+        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address, this.weth.address])
         this.vusd.transferOwnership(this.pool.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
@@ -72,7 +79,6 @@ describe('OptionVaultPair', function () {
 
 
     it('should add liquidity successfully', async function () {
-
         let ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
 
@@ -233,5 +239,31 @@ describe('OptionVaultPair', function () {
         let daiPool = await this.pool.pools(this.dai.address)
         expect(daiPool.status).to.equal(PoolStatus.UNLISTED)
     });
+
+    it('should purchase and sell ETH successfully', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
+            bigNum(400), this.bob.address, deadline, 
+            { ...overrides, value: bigNum(2) }
+            )
+
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+        
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
 
 });

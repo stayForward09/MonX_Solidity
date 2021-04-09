@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "hardhat/console.sol";
 import "./MonoXPool.sol";
+import './interfaces/IWETH.sol';
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -107,13 +108,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   );
 
   MonoXPool public monoXPool;
-  address public constant WETH=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+  // address public immuat WETH=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+  address public WETH;
   address public constant VETH=0x0000000000000000000000000000000000000000;
 
-  function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
+  function initialize(MonoXPool _monoXPool, IvUSD _vusd, address _WETH) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vUSD = _vusd;
+    WETH = _WETH;
+
     fees = 300;
     devFee = 50;
     poolSize = 0;
@@ -348,7 +352,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // standard swap interface implementing uniswap router V2
-  // TODO: add ETH
   
   function swapExactETHForToken(
     // address tokenIn,
@@ -359,7 +362,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountOut) {
     uint amountIn = msg.value;
-    amountOut = swapIn(VETH, tokenOut, to, amountIn);
+    IWETH(WETH).deposit{value: amountIn}();
+    amountOut = swapIn(WETH, tokenOut, to, amountIn);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
 
