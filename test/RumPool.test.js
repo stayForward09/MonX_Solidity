@@ -71,7 +71,9 @@ describe('OptionVaultPair', function () {
         await this.pool.addOfficialToken(this.dai.address, bigNum(1))
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
-            bigNum(1000000), this.alice.address);
+            bigNum(500000), this.alice.address);
+        await this.pool.connect(this.alice).addLiquidityETH(
+            bigNum(500000), this.alice.address);
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
     })

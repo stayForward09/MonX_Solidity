@@ -258,10 +258,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     liquidity = addLiquidityPair(_token, 0, _amount, to);
   }  
 
-  // // add one-sided ETH liquidity to a pool. no vusd
-  // function addLiquidityETH (uint256 _amount, address to) external returns(uint256 liquidity)  {
-  //   liquidity = addLiquidityPair(ETH, 0, _amount, to);
-  // }  
+  // add one-sided ETH liquidity to a pool. no vusd
+  function addLiquidityETH (uint256 _amount, address to) external payable returns(uint256 liquidity)  {
+    IWETH(WETH).deposit{value: msg.value}();
+    liquidity = addLiquidityPair(WETH, 0, _amount, to);
+  }  
 
   // updates pool vusd balance, token balance and last pool value.
   // this function requires others to do the input validation
@@ -314,7 +315,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // actually removes liquidity
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
-    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+    uint256 minTokenOut) public returns(uint256 vusdOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "Monoswap: Token Not Found");
     PoolInfo memory pool = pools[_token];
     uint256 poolValue;
@@ -341,6 +342,18 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       liquidityIn, 
       vusdOut, tokenOut);
     
+  }
+
+  // actually removes ETH liquidity
+  function removeLiquidityETH (uint256 liquidity, address to, 
+    uint256 minVusdOut, 
+    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+    uint256 vusdOut;
+    uint256 tokenOut;
+    (vusdOut, tokenOut) = removeLiquidity (WETH, liquidity, to, minVusdOut, minTokenOut);
+    IWETH(WETH).withdraw(tokenOut);
+    TransferHelper.safeTransferETH(to, tokenOut);
+    return (vusdOut, tokenOut);
   }
 
   // util func to compute new price
