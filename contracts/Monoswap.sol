@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 import "hardhat/console.sol";
 import "./MonoXPool.sol";
 import './interfaces/IWETH.sol';
@@ -108,9 +109,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   );
 
   MonoXPool public monoXPool;
-  // address public immuat WETH=0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
   address public WETH;
-  address public constant VETH=0x0000000000000000000000000000000000000000;
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd, address _WETH) public initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -123,6 +122,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     poolSize = 0;
     unlocked = 1;
   }  
+
+  receive() external payable {
+    assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+  }
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -361,11 +364,42 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountOut) {
-    uint amountIn = msg.value;
-    IWETH(WETH).deposit{value: amountIn}();
-    amountOut = swapIn(WETH, tokenOut, to, amountIn);
+    IWETH(WETH).deposit{value: msg.value}();
+    amountOut = swapIn(WETH, tokenOut, to, msg.value);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
+  
+  function swapExactTokenForETH(
+    address tokenIn,
+    // address tokenOut,
+    uint amountIn,
+    uint amountOutMin,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountOut) {
+    amountOut = swapIn(tokenIn, WETH, to, amountIn);
+    console.log('amountOut', amountOut);
+    require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
+    IWETH(WETH).withdraw(amountOut);
+    TransferHelper.safeTransferETH(to, amountOut);
+  }
+
+  // function swapETHForExactToken(
+  //   // address tokenIn,
+  //   address tokenOut,
+  //   uint amountInMax,
+  //   uint amountOut,
+  //   address to,
+  //   uint deadline
+  // ) external virtual payable ensure(deadline) returns (uint amountIn) {
+  //   IWETH(WETH).deposit{value: msg.value}();
+  //   amountIn = swapOut(WETH, tokenOut, to, amountOut);
+  //   require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+  //   if (msg.value > amountIn) {
+
+  //   }
+  //   assert(IWETH(WETH).transfer(UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]));
+  // }
 
   function swapExactTokenForToken(
     address tokenIn,

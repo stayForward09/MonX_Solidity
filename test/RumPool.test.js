@@ -40,8 +40,7 @@ describe('OptionVaultPair', function () {
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
         this.vusd = await this.vUSD.deploy();
 
-        await this.weth.deposit({value: bigNum(20000000)})
-        // console.log(this.weth.totalSupply())
+        await this.weth.deposit({value: bigNum(100000000)})
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
@@ -240,7 +239,7 @@ describe('OptionVaultPair', function () {
         expect(daiPool.status).to.equal(PoolStatus.UNLISTED)
     });
 
-    it('should purchase and sell ETH successfully', async function () {
+    it('should purchase and sell ETH successfully - swapExactETHForToken', async function () {
 
         const deadline = (await time.latest()) + 10000
 
@@ -265,5 +264,26 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
     });
 
+    it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
+
+        const deadline = (await time.latest()) + 10000
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.dai.address, 
+            bigNum(610), bigNum(2), this.bob.address, deadline)
+        
+        // const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        // const ethPool = await this.pool.pools(this.weth.address);
+
+        // const daiPool = await this.pool.pools(this.dai.address);
+        // expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        // expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        // expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        // expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        // expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        // expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
 
 });
