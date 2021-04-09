@@ -1,9 +1,9 @@
 {
   "manifestVersion": "3.1",
   "impls": {
-    "0f17298cc8afdc3f44deaa3a292eecb780171b0fb51bcde560fe7f53eac7e911": {
+    "5a4fbfcd14ca8f17fdd3e424435a58cd551dd14c4031e6009e1aec4014fe5354": {
       "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-      "txHash": "0x0013eddb4d67b7c5baaf9277d4225f47cd8b04007b12992e066bf39bb5fe9a30",
+      "txHash": "0x3dee82e68bc8a3842bdf56ad930adf8777cd48783542f8945f263940f2d04b04",
       "layout": {
         "storage": [
           {
@@ -106,7 +106,7 @@
             "contract": "Monoswap",
             "label": "WETH",
             "type": "t_address",
-            "src": "contracts/Monoswap.sol:113"
+            "src": "contracts/Monoswap.sol:112"
           }
         ],
         "types": {

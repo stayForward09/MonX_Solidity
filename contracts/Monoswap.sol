@@ -384,22 +384,37 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     TransferHelper.safeTransferETH(to, amountOut);
   }
 
-  // function swapETHForExactToken(
-  //   // address tokenIn,
-  //   address tokenOut,
-  //   uint amountInMax,
-  //   uint amountOut,
-  //   address to,
-  //   uint deadline
-  // ) external virtual payable ensure(deadline) returns (uint amountIn) {
-  //   IWETH(WETH).deposit{value: msg.value}();
-  //   amountIn = swapOut(WETH, tokenOut, to, amountOut);
-  //   require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-  //   if (msg.value > amountIn) {
+  function swapETHForExactToken(
+    // address tokenIn,
+    address tokenOut,
+    uint amountInMax,
+    uint amountOut,
+    address to,
+    uint deadline
+  ) external virtual payable ensure(deadline) returns (uint amountIn) {
+    IWETH(WETH).deposit{value: msg.value}();
+    amountIn = swapOut(WETH, tokenOut, to, amountOut);
+    console.log(amountIn);
+    console.log(amountInMax);
+    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+    if (msg.value > amountIn) {
+      TransferHelper.safeTransferETH(msg.sender, msg.value - amountIn);
+    }
+  }
 
-  //   }
-  //   assert(IWETH(WETH).transfer(UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]));
-  // }
+  function swapTokenForExactETH(
+    address tokenIn,
+    // address tokenOut,
+    uint amountInMax,
+    uint amountOut,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountIn) {
+    amountIn = swapOut(tokenIn, WETH, to, amountOut);
+    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+    IWETH(WETH).withdraw(amountOut);
+    TransferHelper.safeTransferETH(to, amountOut);
+  }
 
   function swapExactTokenForToken(
     address tokenIn,
