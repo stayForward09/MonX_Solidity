@@ -327,7 +327,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vUSD.mint(to, vusdOut);
     }
 
-    IERC20(_token).safeTransfer(to, tokenOut);
+    monoXPool.safeTransferERC20Token(_token, to, tokenOut);
 
     burn(to, pool.pid, liquidityIn);
 
@@ -338,7 +338,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _token,
       liquidityIn, 
       vusdOut, tokenOut);
-    
   }
 
   // actually removes ETH liquidity
@@ -616,7 +615,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to sell side
       _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
     }else{
-      IERC20(tokenOut).safeTransfer(to, amountOut);
+      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
