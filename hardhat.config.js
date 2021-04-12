@@ -37,7 +37,7 @@ module.exports = {
   networks: {
     hardhat: {
       accounts: {
-        accountsBalance: '1000000000000000000000000000' // 1000000000 ETH
+        accountsBalance: '10000000000000000000000000000' // 1000000000 ETH
       }
     },
     ropsten: {

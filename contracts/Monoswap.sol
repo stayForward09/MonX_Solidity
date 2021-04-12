@@ -391,7 +391,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountOut) {
     amountOut = swapIn(tokenIn, WETH, to, amountIn);
-    console.log('amountOut', amountOut);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
     IWETH(WETH).withdraw(amountOut);
     TransferHelper.safeTransferETH(to, amountOut);
@@ -407,8 +406,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   ) external virtual payable ensure(deadline) returns (uint amountIn) {
     IWETH(WETH).deposit{value: msg.value}();
     amountIn = swapOut(WETH, tokenOut, to, amountOut);
-    console.log(amountIn);
-    console.log(amountInMax);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
     if (msg.value > amountIn) {
       TransferHelper.safeTransferETH(msg.sender, msg.value - amountIn);
