@@ -1,13 +1,15 @@
 pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-// import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
+import "hardhat/console.sol";
 import "./MonoXPool.sol";
+import './interfaces/IWETH.sol';
 
 interface IvUSD is IERC20 {
   function mint (address account, uint256 amount) external;
@@ -29,7 +31,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 fees; // over 1e5, 300 means 0.3%
   uint16 devFee; // over 1e5, 50 means 0.05%
 
-  mapping (uint256 => uint256) public totalSupply;
   uint256 constant MINIMUM_LIQUIDITY=1e3;
 
   struct PoolInfo {
@@ -106,16 +107,22 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   );
 
   MonoXPool public monoXPool;
+  
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vUSD = _vusd;
+
     fees = 300;
     devFee = 50;
     poolSize = 0;
     unlocked = 1;
-  }  
+  }
+
+  // receive() external payable {
+  //   assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+  // }
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -138,12 +145,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   function mint (address account, uint256 id, uint256 amount) internal {
-    totalSupply[id]=totalSupply[id].add(amount);
     monoXPool.mint(account, id, amount);
   }
 
   function burn (address account, uint256 id, uint256 amount) internal {
-    totalSupply[id]=totalSupply[id].sub(amount);
     monoXPool.burn(account, id, amount);
   }
 
@@ -174,7 +179,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // internal func to pay contract owner
   function _mintFee (uint256 pid, uint256 lastPoolValue, uint256 newPoolValue) internal {
-    uint256 _totalSupply = totalSupply[pid];
+    
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pid);
     if(newPoolValue>lastPoolValue && lastPoolValue>0) {
       // safe ops, since newPoolValue>lastPoolValue
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
@@ -183,7 +189,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
       monoXPool.mint(feeTo, pid, devLiquidity);
     }
-
+    
   }
 
   // util func to get some basic pool info
@@ -219,10 +225,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     PoolInfo memory pool = pools[_token];
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
-    uint256 _totalSupply = totalSupply[pool.pid];
-    IERC20(_token).safeTransferFrom(msg.sender, address(this), tokenAmount);
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
+    IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
     if(vusdAmount>0){
-      vUSD.safeTransferFrom(msg.sender, address(this), vusdAmount);
+      vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
     }
 
     uint256 liquidityVusdValue = vusdAmount.add(tokenAmount.mul(pool.price)/1e18);
@@ -248,6 +254,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     liquidity = addLiquidityPair(_token, 0, _amount, to);
   }  
 
+  // add one-sided ETH liquidity to a pool. no vusd
+  function addLiquidityETH (uint256 _amount, address to) external payable returns(uint256 liquidity)  {
+    monoXPool.depositWETH(msg.value);
+    liquidity = addLiquidityPair(monoXPool.getWETHAddr(), 0, _amount, to);
+  }  
+
   // updates pool vusd balance, token balance and last pool value.
   // this function requires others to do the input validation
   function _syncPoolInfo (address _token, uint256 vusdIn, uint256 vusdOut) lockToken(_token) internal returns(uint256 poolValue, 
@@ -256,7 +268,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenPoolPrice = pools[_token].price;
     (vusdCredit, vusdDebt) = _updateVusdBalance(_token, vusdIn, vusdOut);
 
-    uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
+    uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
     tokenBalanceVusdValue = tokenPoolPrice.mul(tokenReserve)/1e18;
 
     require(tokenReserve <= uint112(-1), 'OVERFLOW');
@@ -276,10 +288,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vusdDebt;
     PoolInfo memory pool = pools[_token];
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
-    uint256 _totalSupply = totalSupply[pool.pid];
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
     liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
-    uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
+    uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
     
     if(tokenReserve < pool.tokenBalance){
       tokenBalanceVusdValue = tokenReserve.mul(pool.price)/1e18;
@@ -299,7 +311,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // actually removes liquidity
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
-    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+    uint256 minTokenOut) public returns(uint256 vusdOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "Monoswap: Token Not Found");
     PoolInfo memory pool = pools[_token];
     uint256 poolValue;
@@ -314,7 +326,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vUSD.mint(to, vusdOut);
     }
 
-    IERC20(_token).safeTransfer(to, tokenOut);
+    monoXPool.safeTransferERC20Token(_token, to, tokenOut);
 
     burn(to, pool.pid, liquidityIn);
 
@@ -325,7 +337,18 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _token,
       liquidityIn, 
       vusdOut, tokenOut);
-    
+  }
+
+  // actually removes ETH liquidity
+  function removeLiquidityETH (uint256 liquidity, address to, 
+    uint256 minVusdOut, 
+    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+    uint256 vusdOut;
+    uint256 tokenOut;
+    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut);
+    monoXPool.withdrawWETH(tokenOut);
+    TransferHelper.safeTransferETH(to, tokenOut);
+    return (vusdOut, tokenOut);
   }
 
   // util func to compute new price
@@ -340,7 +363,60 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // standard swap interface implementing uniswap router V2
-  // TODO: add ETH
+  
+  function swapExactETHForToken(
+    address tokenOut,
+    uint amountOutMin,
+    address to,
+    uint deadline
+  ) external virtual payable ensure(deadline) returns (uint amountOut) {
+    TransferHelper.safeTransferETH(address(monoXPool), msg.value);
+    monoXPool.depositWETH(msg.value);
+    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, to, msg.value);
+    require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
+  }
+  
+  function swapExactTokenForETH(
+    address tokenIn,
+    uint amountIn,
+    uint amountOutMin,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountOut) {
+    amountOut = swapIn(tokenIn, monoXPool.getWETHAddr(), to, amountIn);
+    require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
+    monoXPool.withdrawWETH(amountOut);
+    monoXPool.safeTransferETH(to, amountOut);
+  }
+
+  function swapETHForExactToken(
+    address tokenOut,
+    uint amountInMax,
+    uint amountOut,
+    address to,
+    uint deadline
+  ) external virtual payable ensure(deadline) returns (uint amountIn) {
+    monoXPool.depositWETH(msg.value);
+    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, to, amountOut);
+    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+    if (msg.value > amountIn) {
+      monoXPool.safeTransferETH(msg.sender, msg.value - amountIn);
+    }
+  }
+
+  function swapTokenForExactETH(
+    address tokenIn,
+    uint amountInMax,
+    uint amountOut,
+    address to,
+    uint deadline
+  ) external virtual ensure(deadline) returns (uint amountIn) {
+    amountIn = swapOut(tokenIn, monoXPool.getWETHAddr(), to, amountOut);
+    require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+    monoXPool.withdrawWETH(amountOut);
+    monoXPool.safeTransferETH(to, amountOut);
+  }
+
   function swapExactTokenForToken(
     address tokenIn,
     address tokenOut,
@@ -440,7 +516,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
       uint256 _vusdIn, uint256 _vusdOut) internal {
-    uint256 _balance = IERC20(_token).balanceOf(address(this));
+    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(_balance);
@@ -505,11 +581,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
 
     if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
     }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
       require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
     }
 
@@ -519,7 +595,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     // trading in
     if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(this), amountIn);
+      vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to buy side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
@@ -532,7 +608,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to sell side
       _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
     }else{
-      IERC20(tokenOut).safeTransfer(to, amountOut);
+      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
@@ -596,11 +672,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     IvUSD vusdLocal = vUSD;
 
     if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
     }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
       amountIn = balanceIn1.sub(balanceIn0);
     }
 
@@ -609,13 +685,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
     uint256 tradeVusdValue;
+    
     (tokenInPrice, tokenOutPrice, amountOut, tradeVusdValue) = getAmountOut(tokenIn, tokenOut, amountIn);
 
     uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
 
     // trading in
     if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(this), amountIn);
+      vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to the other side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
@@ -626,7 +703,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     if(tokenOut==address(vusdLocal)){
       vusdLocal.mint(to, amountOut);
     }else{
-      IERC20(tokenOut).safeTransfer(to, amountOut);
+      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 

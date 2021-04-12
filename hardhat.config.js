@@ -35,6 +35,11 @@ module.exports = {
     }
   },
   networks: {
+    hardhat: {
+      accounts: {
+        accountsBalance: '10000000000000000000000000000' // 1000000000 ETH
+      }
+    },
     ropsten: {
       url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.ROPSTEN_PRIVATE_KEY}`]

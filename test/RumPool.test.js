@@ -15,6 +15,10 @@ const PoolStatus = {
     OFFICIAL: 2
 }
 
+const overrides = {
+    gasLimit: 9500000
+}
+
 describe('OptionVaultPair', function () {
     before(async function () {
         this.signers = await ethers.getSigners()
@@ -25,16 +29,18 @@ describe('OptionVaultPair', function () {
         this.minter = this.signers[4]
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
+        this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vUSD = await ethers.getContractFactory('VUSD');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
     })
     
     beforeEach(async function () {
-        this.weth = await this.MockERC20.deploy('WETH', 'WETH', e26);
+        this.weth = await this.WETH9.deploy();
         this.yfi = await this.MockERC20.deploy('YFI', 'YFI', e26);
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
         this.vusd = await this.vUSD.deploy();
 
+        await this.weth.deposit({value: bigNum(100000000)})
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
@@ -42,8 +48,8 @@ describe('OptionVaultPair', function () {
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
-        this.monoXPool = await this.MonoXPool.deploy()
-        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address)
+        this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
+        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address])
         this.vusd.transferOwnership(this.pool.address)
         this.monoXPool.transferOwnership(this.pool.address)
@@ -65,14 +71,15 @@ describe('OptionVaultPair', function () {
         await this.pool.addOfficialToken(this.dai.address, bigNum(1))
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
-            bigNum(1000000), this.alice.address);
+            bigNum(500000), this.alice.address);
+        await this.pool.connect(this.alice).addLiquidityETH(
+            bigNum(500000), this.alice.address);
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
     })
 
 
     it('should add liquidity successfully', async function () {
-
         let ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
 
@@ -232,6 +239,93 @@ describe('OptionVaultPair', function () {
         await this.pool.updatePoolStatus(this.dai.address, PoolStatus.UNLISTED) 
         let daiPool = await this.pool.pools(this.dai.address)
         expect(daiPool.status).to.equal(PoolStatus.UNLISTED)
+    });
+
+    it('should purchase and sell ETH successfully - swapExactETHForToken', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
+            bigNum(400), this.bob.address, deadline, 
+            { ...overrides, value: bigNum(2) }
+            )
+
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+        
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
+    it('should purchase and sell ERC-20 successfully - swapETHForExactToken', async function () {
+        const deadline = (await time.latest()) + 10000
+        await this.pool.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(2), bigNum(590), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
+    it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
+        const deadline = (await time.latest()) + 10000
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.dai.address, 
+            bigNum(610), bigNum(2), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-650)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
+    });
+
+    it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
+        const deadline = (await time.latest()) + 10000
+        await this.pool.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(2), bigNum(590), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
     });
 
 });
