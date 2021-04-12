@@ -32,7 +32,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 fees; // over 1e5, 300 means 0.3%
   uint16 devFee; // over 1e5, 50 means 0.05%
 
-  mapping (uint256 => uint256) public totalSupply;
   uint256 constant MINIMUM_LIQUIDITY=1e3;
 
   struct PoolInfo {
@@ -148,12 +147,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   function mint (address account, uint256 id, uint256 amount) internal {
-    totalSupply[id]=totalSupply[id].add(amount);
     monoXPool.mint(account, id, amount);
   }
 
   function burn (address account, uint256 id, uint256 amount) internal {
-    totalSupply[id]=totalSupply[id].sub(amount);
     monoXPool.burn(account, id, amount);
   }
 
@@ -184,7 +181,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // internal func to pay contract owner
   function _mintFee (uint256 pid, uint256 lastPoolValue, uint256 newPoolValue) internal {
-    uint256 _totalSupply = totalSupply[pid];
+    
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pid);
     if(newPoolValue>lastPoolValue && lastPoolValue>0) {
       // safe ops, since newPoolValue>lastPoolValue
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
@@ -193,7 +191,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 devLiquidity = _totalSupply.mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
       monoXPool.mint(feeTo, pid, devLiquidity);
     }
-
+    
   }
 
   // util func to get some basic pool info
@@ -229,7 +227,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     PoolInfo memory pool = pools[_token];
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
-    uint256 _totalSupply = totalSupply[pool.pid];
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
     IERC20(_token).safeTransferFrom(msg.sender, address(this), tokenAmount);
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(this), vusdAmount);
@@ -292,7 +290,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vusdDebt;
     PoolInfo memory pool = pools[_token];
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
-    uint256 _totalSupply = totalSupply[pool.pid];
+    uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
     liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(this));

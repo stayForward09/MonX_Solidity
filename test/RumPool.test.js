@@ -287,24 +287,24 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
     });
 
-    it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
-        const deadline = (await time.latest()) + 10000
-        await this.pool.connect(this.bob).swapExactTokenForETH(
-            this.dai.address, 
-            bigNum(610), bigNum(2), this.bob.address, deadline)
+    // it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
+    //     const deadline = (await time.latest()) + 10000
+    //     await this.pool.connect(this.bob).swapExactTokenForETH(
+    //         this.dai.address, 
+    //         bigNum(610), bigNum(2), this.bob.address, deadline)
         
-        const daiAmount = await this.dai.balanceOf(this.bob.address)
+    //     const daiAmount = await this.dai.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
+    //     const ethPool = await this.pool.pools(this.weth.address);
 
-        const daiPool = await this.pool.pools(this.dai.address);
-        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-650)
-        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
+    //     const daiPool = await this.pool.pools(this.dai.address);
+    //     expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-650)
+    //     expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
 
-        expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
-        expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
+    //     expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
+    //     expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
 
-        expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
-    });
+    //     expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
+    // });
 
 });
