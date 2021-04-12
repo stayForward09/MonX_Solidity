@@ -108,23 +108,22 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   );
 
   MonoXPool public monoXPool;
-  address public WETH;
+  
 
-  function initialize(MonoXPool _monoXPool, IvUSD _vusd, address _WETH) public initializer {
+  function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vUSD = _vusd;
-    WETH = _WETH;
 
     fees = 300;
     devFee = 50;
     poolSize = 0;
     unlocked = 1;
-  }  
-
-  receive() external payable {
-    assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
   }
+
+  // receive() external payable {
+  //   assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
+  // }
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -228,9 +227,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
-    IERC20(_token).safeTransferFrom(msg.sender, address(this), tokenAmount);
+    IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
     if(vusdAmount>0){
-      vUSD.safeTransferFrom(msg.sender, address(this), vusdAmount);
+      vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
     }
 
     uint256 liquidityVusdValue = vusdAmount.add(tokenAmount.mul(pool.price)/1e18);
@@ -258,8 +257,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // add one-sided ETH liquidity to a pool. no vusd
   function addLiquidityETH (uint256 _amount, address to) external payable returns(uint256 liquidity)  {
-    IWETH(WETH).deposit{value: msg.value}();
-    liquidity = addLiquidityPair(WETH, 0, _amount, to);
+    monoXPool.depositWETH(msg.value);
+    liquidity = addLiquidityPair(monoXPool.getWETHAddr(), 0, _amount, to);
   }  
 
   // updates pool vusd balance, token balance and last pool value.
@@ -270,7 +269,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenPoolPrice = pools[_token].price;
     (vusdCredit, vusdDebt) = _updateVusdBalance(_token, vusdIn, vusdOut);
 
-    uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
+    uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
     tokenBalanceVusdValue = tokenPoolPrice.mul(tokenReserve)/1e18;
 
     require(tokenReserve <= uint112(-1), 'OVERFLOW');
@@ -293,7 +292,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
     liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
-    uint256 tokenReserve = IERC20(_token).balanceOf(address(this));
+    uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
     
     if(tokenReserve < pool.tokenBalance){
       tokenBalanceVusdValue = tokenReserve.mul(pool.price)/1e18;
@@ -343,16 +342,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // actually removes ETH liquidity
-  function removeLiquidityETH (uint256 liquidity, address to, 
-    uint256 minVusdOut, 
-    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
-    uint256 vusdOut;
-    uint256 tokenOut;
-    (vusdOut, tokenOut) = removeLiquidity (WETH, liquidity, to, minVusdOut, minTokenOut);
-    IWETH(WETH).withdraw(tokenOut);
-    TransferHelper.safeTransferETH(to, tokenOut);
-    return (vusdOut, tokenOut);
-  }
+  // function removeLiquidityETH (uint256 liquidity, address to, 
+  //   uint256 minVusdOut, 
+  //   uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+  //   uint256 vusdOut;
+  //   uint256 tokenOut;
+  //   (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut);
+  //   IWETH(WETH).withdraw(tokenOut);
+  //   TransferHelper.safeTransferETH(to, tokenOut);
+  //   return (vusdOut, tokenOut);
+  // }
 
   // util func to compute new price
   function _getNewPrice (uint256 originalPrice, uint256 reserve, 
@@ -375,8 +374,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountOut) {
-    IWETH(WETH).deposit{value: msg.value}();
-    amountOut = swapIn(WETH, tokenOut, to, msg.value);
+    TransferHelper.safeTransferETH(address(monoXPool), msg.value);
+    monoXPool.depositWETH(msg.value);
+    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, to, msg.value);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
   
@@ -388,10 +388,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountOut) {
-    amountOut = swapIn(tokenIn, WETH, to, amountIn);
+    amountOut = swapIn(tokenIn, monoXPool.getWETHAddr(), to, amountIn);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
-    IWETH(WETH).withdraw(amountOut);
-    TransferHelper.safeTransferETH(to, amountOut);
+    monoXPool.withdrawWETH(amountOut);
+    monoXPool.safeTransferETH(to, amountOut);
   }
 
   function swapETHForExactToken(
@@ -402,11 +402,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountIn) {
-    IWETH(WETH).deposit{value: msg.value}();
-    amountIn = swapOut(WETH, tokenOut, to, amountOut);
+    monoXPool.depositWETH(msg.value);
+    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, to, amountOut);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
     if (msg.value > amountIn) {
-      TransferHelper.safeTransferETH(msg.sender, msg.value - amountIn);
+      monoXPool.safeTransferETH(msg.sender, msg.value - amountIn);
     }
   }
 
@@ -418,10 +418,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountIn) {
-    amountIn = swapOut(tokenIn, WETH, to, amountOut);
+    amountIn = swapOut(tokenIn, monoXPool.getWETHAddr(), to, amountOut);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-    IWETH(WETH).withdraw(amountOut);
-    TransferHelper.safeTransferETH(to, amountOut);
+    // IWETH(WETH).withdraw(amountOut);
+    monoXPool.withdrawWETH(amountOut);
+    monoXPool.safeTransferETH(to, amountOut);
   }
 
   function swapExactTokenForToken(
@@ -523,7 +524,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
       uint256 _vusdIn, uint256 _vusdOut) internal {
-    uint256 _balance = IERC20(_token).balanceOf(address(this));
+    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(_balance);
@@ -588,11 +589,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
 
     if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
     }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
       require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
     }
 
@@ -602,7 +603,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     // trading in
     if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(this), amountIn);
+      vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to buy side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
@@ -679,11 +680,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     IvUSD vusdLocal = vUSD;
 
     if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
     }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(this));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(this));
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
       amountIn = balanceIn1.sub(balanceIn0);
     }
 
@@ -699,7 +700,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     // trading in
     if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(this), amountIn);
+      vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to the other side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
@@ -710,7 +711,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     if(tokenOut==address(vusdLocal)){
       vusdLocal.mint(to, amountOut);
     }else{
-      IERC20(tokenOut).safeTransfer(to, amountOut);
+      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
@@ -725,4 +726,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function balanceOf(address account, uint256 id) public view returns (uint256) {
     return monoXPool.balanceOf(account, id);
   }
+
+  // function depositWETH() {
+    
+  //   IWETH(WETH).deposit{value: msg.value}();
+  // }
+
+  // function depositWETH() {
+
+  // }
 }
