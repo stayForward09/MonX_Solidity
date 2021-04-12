@@ -3,7 +3,7 @@
   "impls": {
     "080b9b24838ce0aa6d475560e5c113ea40586e1553cc47d2c9c60e5e291c2acf": {
       "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-      "txHash": "0x5d64ebe1085419b00cfbec6760a689ea3f43d532054276f79cac3b57c1ca7e81",
+      "txHash": "0xb1204b5343654beadf29f2b56ca3732d7ac303faf68e5252e195388a00d3f6db",
       "layout": {
         "storage": [
           {
@@ -39,66 +39,66 @@
           {
             "contract": "Monoswap",
             "label": "vUSD",
-            "type": "t_contract(IvUSD)3690",
-            "src": "contracts/Monoswap.sol:30"
+            "type": "t_contract(IvUSD)3696",
+            "src": "contracts/Monoswap.sol:29"
           },
           {
             "contract": "Monoswap",
             "label": "feeTo",
             "type": "t_address",
-            "src": "contracts/Monoswap.sol:31"
+            "src": "contracts/Monoswap.sol:30"
           },
           {
             "contract": "Monoswap",
             "label": "fees",
             "type": "t_uint16",
-            "src": "contracts/Monoswap.sol:32"
+            "src": "contracts/Monoswap.sol:31"
           },
           {
             "contract": "Monoswap",
             "label": "devFee",
             "type": "t_uint16",
-            "src": "contracts/Monoswap.sol:33"
+            "src": "contracts/Monoswap.sol:32"
           },
           {
             "contract": "Monoswap",
             "label": "pools",
-            "type": "t_mapping(t_address,t_struct(PoolInfo)3732_storage)",
-            "src": "contracts/Monoswap.sol:59"
+            "type": "t_mapping(t_address,t_struct(PoolInfo)3738_storage)",
+            "src": "contracts/Monoswap.sol:58"
           },
           {
             "contract": "Monoswap",
             "label": "tokenStatus",
             "type": "t_mapping(t_address,t_uint8)",
-            "src": "contracts/Monoswap.sol:60"
+            "src": "contracts/Monoswap.sol:59"
           },
           {
             "contract": "Monoswap",
             "label": "tokenPoolStatus",
             "type": "t_mapping(t_address,t_uint8)",
-            "src": "contracts/Monoswap.sol:61"
+            "src": "contracts/Monoswap.sol:60"
           },
           {
             "contract": "Monoswap",
             "label": "poolSize",
             "type": "t_uint256",
-            "src": "contracts/Monoswap.sol:63"
+            "src": "contracts/Monoswap.sol:62"
           },
           {
             "contract": "Monoswap",
             "label": "unlocked",
             "type": "t_uint256",
-            "src": "contracts/Monoswap.sol:65"
+            "src": "contracts/Monoswap.sol:64"
           },
           {
             "contract": "Monoswap",
             "label": "monoXPool",
-            "type": "t_contract(MonoXPool)3661",
-            "src": "contracts/Monoswap.sol:110"
+            "type": "t_contract(MonoXPool)3667",
+            "src": "contracts/Monoswap.sol:109"
           }
         ],
         "types": {
-          "t_contract(IvUSD)3690": {
+          "t_contract(IvUSD)3696": {
             "label": "contract IvUSD"
           },
           "t_address": {
@@ -107,10 +107,10 @@
           "t_uint16": {
             "label": "uint16"
           },
-          "t_mapping(t_address,t_struct(PoolInfo)3732_storage)": {
+          "t_mapping(t_address,t_struct(PoolInfo)3738_storage)": {
             "label": "mapping(address => struct Monoswap.PoolInfo)"
           },
-          "t_struct(PoolInfo)3732_storage": {
+          "t_struct(PoolInfo)3738_storage": {
             "label": "struct Monoswap.PoolInfo",
             "members": [
               {
@@ -127,7 +127,7 @@
               },
               {
                 "label": "status",
-                "type": "t_enum(PoolStatus)3739"
+                "type": "t_enum(PoolStatus)3745"
               },
               {
                 "label": "vusdDebt",
@@ -150,7 +150,7 @@
           "t_uint256": {
             "label": "uint256"
           },
-          "t_enum(PoolStatus)3739": {
+          "t_enum(PoolStatus)3745": {
             "label": "enum Monoswap.PoolStatus",
             "members": [
               "UNLISTED",
@@ -167,7 +167,7 @@
           "t_uint8": {
             "label": "uint8"
           },
-          "t_contract(MonoXPool)3661": {
+          "t_contract(MonoXPool)3667": {
             "label": "contract MonoXPool"
           },
           "t_array(t_uint256)49_storage": {

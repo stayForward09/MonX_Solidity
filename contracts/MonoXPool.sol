@@ -41,15 +41,15 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       IWETH(WETH).deposit{value: amount}();
     }
 
-    function withdrawWETH(uint256 amount) external {
+    function withdrawWETH(uint256 amount) external onlyOwner{
       IWETH(WETH).withdraw(amount);
     }
 
-    function safeTransferETH(address to, uint amount) external {
+    function safeTransferETH(address to, uint amount) external onlyOwner {
       TransferHelper.safeTransferETH(to, amount);
     }
 
-    function safeTransferERC20Token(address token, address to, uint256 amount) external {
+    function safeTransferERC20Token(address token, address to, uint256 amount) external onlyOwner{
       IERC20(token).safeTransfer(to, amount);
     }
 
