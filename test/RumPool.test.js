@@ -307,4 +307,25 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
     });
 
+    it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
+        const deadline = (await time.latest()) + 10000
+        await this.pool.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(2), bigNum(590), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
 });
