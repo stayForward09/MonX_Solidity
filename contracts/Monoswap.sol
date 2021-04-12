@@ -366,9 +366,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // standard swap interface implementing uniswap router V2
   
   function swapExactETHForToken(
-    // address tokenIn,
     address tokenOut,
-    // uint amountIn,
     uint amountOutMin,
     address to,
     uint deadline
@@ -381,7 +379,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   function swapExactTokenForETH(
     address tokenIn,
-    // address tokenOut,
     uint amountIn,
     uint amountOutMin,
     address to,
@@ -394,7 +391,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   function swapETHForExactToken(
-    // address tokenIn,
     address tokenOut,
     uint amountInMax,
     uint amountOut,
@@ -411,7 +407,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   function swapTokenForExactETH(
     address tokenIn,
-    // address tokenOut,
     uint amountInMax,
     uint amountOut,
     address to,
@@ -419,7 +414,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   ) external virtual ensure(deadline) returns (uint amountIn) {
     amountIn = swapOut(tokenIn, monoXPool.getWETHAddr(), to, amountOut);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-    // IWETH(WETH).withdraw(amountOut);
     monoXPool.withdrawWETH(amountOut);
     monoXPool.safeTransferETH(to, amountOut);
   }
@@ -725,13 +719,4 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function balanceOf(address account, uint256 id) public view returns (uint256) {
     return monoXPool.balanceOf(account, id);
   }
-
-  // function depositWETH() {
-    
-  //   IWETH(WETH).deposit{value: msg.value}();
-  // }
-
-  // function depositWETH() {
-
-  // }
 }
