@@ -341,16 +341,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // actually removes ETH liquidity
-  // function removeLiquidityETH (uint256 liquidity, address to, 
-  //   uint256 minVusdOut, 
-  //   uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
-  //   uint256 vusdOut;
-  //   uint256 tokenOut;
-  //   (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut);
-  //   IWETH(WETH).withdraw(tokenOut);
-  //   TransferHelper.safeTransferETH(to, tokenOut);
-  //   return (vusdOut, tokenOut);
-  // }
+  function removeLiquidityETH (uint256 liquidity, address to, 
+    uint256 minVusdOut, 
+    uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
+    uint256 vusdOut;
+    uint256 tokenOut;
+    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut);
+    monoXPool.withdrawWETH(tokenOut);
+    TransferHelper.safeTransferETH(to, tokenOut);
+    return (vusdOut, tokenOut);
+  }
 
   // util func to compute new price
   function _getNewPrice (uint256 originalPrice, uint256 reserve, 
