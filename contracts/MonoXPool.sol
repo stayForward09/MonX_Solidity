@@ -21,7 +21,6 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     }
 
     receive() external payable {
-      // assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
     }
 
     function mint (address account, uint256 id, uint256 amount) public onlyOwner {
