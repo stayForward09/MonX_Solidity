@@ -362,6 +362,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     }
   }
 
+  // util func to compute new price
+  function _getAvgPrice (uint256 originalPrice, uint256 newPrice) pure internal returns(uint256 price) {
+    price = originalPrice.add(newPrice.mul(4))/5;
+  }
+
   // standard swap interface implementing uniswap router V2
   
   function swapExactETHForToken(
@@ -534,6 +539,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     uint256 amountOutWithFee = amountOut.mul(1e5+fees)/1e5;
     address vusdAddress = address(vUSD);
+    uint tokenOutPoolPrice = 0;
 
     if(tokenOut==vusdAddress){
       tradeVusdValue = amountOutWithFee;
@@ -542,13 +548,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       require (tokenPoolStatus[tokenOut]==1, "Monoswap: Token Not Found");
       // PoolInfo memory tokenOutPool = pools[tokenOut];
       PoolStatus tokenOutPoolStatus = pools[tokenOut].status;
-      uint tokenOutPoolPrice = pools[tokenOut].price;
+      tokenOutPoolPrice = pools[tokenOut].price;
       uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
       require (tokenOutPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
       tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
         amountOutWithFee, TxType.BUY);
 
-      tradeVusdValue = tokenOutPrice.mul(amountOutWithFee)/1e18;
+      tradeVusdValue = _getAvgPrice(tokenOutPoolPrice, tokenOutPrice).mul(amountOutWithFee)/1e18;
     }
 
     if(tokenIn==vusdAddress){
@@ -561,63 +567,20 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint tokenInPoolPrice = pools[tokenIn].price;
       uint tokenInPoolTokenBalance = pools[tokenIn].tokenBalance;
       require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
-      
-      uint256 preliminaryAmountIn = tradeVusdValue.mul(1e18).div(tokenInPoolPrice);
+
+      uint256 preliminaryAmountIn = tradeVusdValue.add(tokenInPoolTokenBalance.mul(tokenInPoolPrice).div(1e18));
+      preliminaryAmountIn = tradeVusdValue.mul(tokenInPoolTokenBalance).div(preliminaryAmountIn);
+
+      // assuming p1*p2 = k, equivalent to uniswap's x * y = k
+      uint directSwapTokenInPrice = tokenOutPoolPrice>0&&tokenInPoolStatus==PoolStatus.OFFICIAL?tokenOutPoolPrice.mul(tokenInPoolPrice).div(tokenOutPrice):1;
+
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
         preliminaryAmountIn, TxType.SELL);
-      amountIn = tradeVusdValue.mul(1e18).div(tokenInPrice);
+
+      tokenInPrice = directSwapTokenInPrice > tokenInPrice?directSwapTokenInPrice:tokenInPrice;
+
+      amountIn = tradeVusdValue.mul(1e18).div(_getAvgPrice(tokenInPoolPrice, tokenInPrice));
     }
-  }
-  
-  // swap from tokenIn to tokenOut with fixed tokenOut amount.
-  function swapOut (address tokenIn, address tokenOut, address to, 
-      uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
-
-    IvUSD vusdLocal = vUSD;
-
-    uint256 tokenInPrice;
-    uint256 tokenOutPrice;
-    uint256 tradeVusdValue;
-    (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
-
-    if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-    }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
-    }
-
-    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
-
-    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
-
-    // trading in
-    if(tokenIn==address(vusdLocal)){
-      vusdLocal.burn(address(monoXPool), amountIn);
-      // all fees go to buy side
-      oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
-    }else{
-      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
-    }
-
-    // trading out
-    if(tokenOut==address(vusdLocal)){
-      vusdLocal.mint(to, amountOut);
-      // all fees go to sell side
-      _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
-    }else{
-      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
-      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
-    }
-
-    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
-
-    delete tokenInPrice;
-    delete tokenOutPrice;
-    delete tradeVusdValue;
-    delete oneSideFeesInVusd;
   }
 
   // view func to compute amount required for tokenOut to get fixed amount of tokenIn
@@ -628,6 +591,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     uint256 amountInWithFee = amountIn.mul(1e5-fees)/1e5;
     address vusdAddress = address(vUSD);
+    uint tokenInPoolPrice = 0;
 
     if(tokenIn==vusdAddress){
       tradeVusdValue = amountInWithFee;
@@ -636,14 +600,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       require (tokenPoolStatus[tokenIn]==1, "Monoswap: Token Not Found");
       // PoolInfo memory tokenInPool = pools[tokenIn];
       PoolStatus tokenInPoolStatus = pools[tokenIn].status;
-      uint tokenInPoolPrice = pools[tokenIn].price;
+      tokenInPoolPrice = pools[tokenIn].price;
       uint tokenInPoolTokenBalance = pools[tokenIn].tokenBalance;
 
       require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
       
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
         amountInWithFee, TxType.SELL);
-      tradeVusdValue = tokenInPrice.mul(amountInWithFee)/1e18;
+      tradeVusdValue = _getAvgPrice(tokenInPoolPrice, tokenInPrice).mul(amountInWithFee)/1e18;
     }
 
     if(tokenOut==vusdAddress){
@@ -657,11 +621,19 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
 
       require (tokenOutPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
-      uint256 preliminaryAmountOut = tradeVusdValue.mul(1e18).div(tokenOutPoolPrice);
+      
+      uint256 preliminaryAmountOut = tradeVusdValue.add(tokenOutPoolTokenBalance.mul(tokenOutPoolPrice).div(1e18));
+      preliminaryAmountOut = tradeVusdValue.mul(tokenOutPoolTokenBalance).div(preliminaryAmountOut);
+
+      // assuming p1*p2 = k, equivalent to uniswap's x * y = k
+      uint directSwapTokenOutPrice = tokenInPoolPrice>0&&tokenOutPoolStatus==PoolStatus.OFFICIAL?tokenInPoolPrice.mul(tokenOutPoolPrice).div(tokenInPrice):uint(-1);
+
+      // prevent the attack where user can use a small pool to update price in a much larger pool
       tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
         preliminaryAmountOut, TxType.BUY);
+      tokenOutPrice = directSwapTokenOutPrice < tokenOutPrice?directSwapTokenOutPrice:tokenOutPrice;
 
-      amountOut = tradeVusdValue.mul(1e18).div(tokenOutPrice);
+      amountOut = tradeVusdValue.mul(1e18).div(_getAvgPrice(tokenOutPoolPrice, tokenOutPrice));
     }
   }
 
@@ -709,6 +681,58 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
     
+    delete tokenInPrice;
+    delete tokenOutPrice;
+    delete tradeVusdValue;
+    delete oneSideFeesInVusd;
+  }
+
+  
+  // swap from tokenIn to tokenOut with fixed tokenOut amount.
+  function swapOut (address tokenIn, address tokenOut, address to, 
+      uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
+
+    IvUSD vusdLocal = vUSD;
+
+    uint256 tokenInPrice;
+    uint256 tokenOutPrice;
+    uint256 tradeVusdValue;
+    (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
+
+    if(tokenStatus[tokenIn]==2){
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+    }else{
+      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
+      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
+      require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
+    }
+
+    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
+
+    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
+
+    // trading in
+    if(tokenIn==address(vusdLocal)){
+      vusdLocal.burn(address(monoXPool), amountIn);
+      // all fees go to buy side
+      oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
+    }else{
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
+    }
+
+    // trading out
+    if(tokenOut==address(vusdLocal)){
+      vusdLocal.mint(to, amountOut);
+      // all fees go to sell side
+      _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
+    }else{
+      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
+      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
+    }
+
+    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
+
     delete tokenInPrice;
     delete tokenOutPrice;
     delete tradeVusdValue;
