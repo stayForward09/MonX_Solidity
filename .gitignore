@@ -2,7 +2,7 @@
 /build/
 /cache/
 /coverage
-.openzeppelin/.session
+.openzeppelin
 .env
 artifacts
 #artifacts/@openzeppelin
