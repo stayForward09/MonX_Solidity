@@ -345,7 +345,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
     uint256 vusdOut;
     uint256 tokenOut;
-    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, monoXPool.getWETHAddr(), minVusdOut, minTokenOut);
+    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, address(monoXPool), minVusdOut, minTokenOut);
     monoXPool.withdrawWETH(tokenOut);
     TransferHelper.safeTransferETH(to, tokenOut);
     return (vusdOut, tokenOut);
