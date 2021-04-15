@@ -643,7 +643,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // swap from tokenIn to tokenOut with fixed tokenIn amount.
   function swapIn (address tokenIn, address tokenOut, address from, address to,
-      uint256 amountIn) public lockToken(tokenIn) returns(uint256 amountOut)  {
+      uint256 amountIn) internal lockToken(tokenIn) returns(uint256 amountOut)  {
 
 
     if(from != address(this)) {
@@ -697,7 +697,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   // swap from tokenIn to tokenOut with fixed tokenOut amount.
   function swapOut (address tokenIn, address tokenOut, address from, address to, 
-      uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
+      uint256 amountOut) internal lockToken(tokenIn) returns(uint256 amountIn)  {
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
     uint256 tradeVusdValue;
