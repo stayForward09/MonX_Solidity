@@ -345,7 +345,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
     uint256 vusdOut;
     uint256 tokenOut;
-    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut);
+    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, monoXPool.getWETHAddr(), minVusdOut, minTokenOut);
     monoXPool.withdrawWETH(tokenOut);
     TransferHelper.safeTransferETH(to, tokenOut);
     return (vusdOut, tokenOut);
@@ -377,7 +377,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   ) external virtual payable ensure(deadline) returns (uint amountOut) {
     TransferHelper.safeTransferETH(address(monoXPool), msg.value);
     monoXPool.depositWETH(msg.value);
-    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, to, msg.value);
+    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, monoXPool.getWETHAddr(), to, msg.value);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
   
@@ -388,7 +388,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountOut) {
-    amountOut = swapIn(tokenIn, monoXPool.getWETHAddr(), to, amountIn);
+    amountOut = swapIn(tokenIn, monoXPool.getWETHAddr(), msg.sender, monoXPool.getWETHAddr(), amountIn);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
     monoXPool.withdrawWETH(amountOut);
     monoXPool.safeTransferETH(to, amountOut);
@@ -401,10 +401,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountIn) {
+    TransferHelper.safeTransferETH(address(monoXPool), msg.value);
     monoXPool.depositWETH(msg.value);
-    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, to, amountOut);
+    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, monoXPool.getWETHAddr(), to, amountOut);
+    require(amountIn < msg.value, 'Monoswap: WRONG_INPUT_AMOUNT');
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
+    
     if (msg.value > amountIn) {
+      monoXPool.withdrawWETH(msg.value - amountIn);
       monoXPool.safeTransferETH(msg.sender, msg.value - amountIn);
     }
   }
@@ -416,7 +420,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountIn) {
-    amountIn = swapOut(tokenIn, monoXPool.getWETHAddr(), to, amountOut);
+    swapOut(tokenIn, monoXPool.getWETHAddr(), msg.sender, monoXPool.getWETHAddr(), amountOut);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
     monoXPool.withdrawWETH(amountOut);
     monoXPool.safeTransferETH(to, amountOut);
@@ -430,7 +434,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountOut) {
-    amountOut = swapIn(tokenIn, tokenOut, to, amountIn);
+    amountOut = swapIn(tokenIn, tokenOut, msg.sender, to, amountIn);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
 
@@ -442,7 +446,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual ensure(deadline) returns (uint amountIn) {
-    amountIn = swapOut(tokenIn, tokenOut, to, amountOut);
+    amountIn = swapOut(tokenIn, tokenOut, msg.sender, to, amountOut);
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
   }
 
@@ -638,20 +642,23 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // swap from tokenIn to tokenOut with fixed tokenIn amount.
-  function swapIn (address tokenIn, address tokenOut, address to,
+  function swapIn (address tokenIn, address tokenOut, address from, address to,
       uint256 amountIn) public lockToken(tokenIn) returns(uint256 amountOut)  {
 
-    IvUSD vusdLocal = vUSD;
 
-    if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-    }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      amountIn = balanceIn1.sub(balanceIn0);
+    if(from != monoXPool.getWETHAddr()) {
+      if(tokenStatus[tokenIn]==2){
+        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
+      }else{
+        uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
+        uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
+        amountIn = balanceIn1.sub(balanceIn0);
+      }
     }
 
+    IvUSD vusdLocal = vUSD;
+    
     uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
 
     uint256 tokenInPrice;
@@ -689,24 +696,25 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   
   // swap from tokenIn to tokenOut with fixed tokenOut amount.
-  function swapOut (address tokenIn, address tokenOut, address to, 
+  function swapOut (address tokenIn, address tokenOut, address from, address to, 
       uint256 amountOut) public lockToken(tokenIn) returns(uint256 amountIn)  {
-
-    IvUSD vusdLocal = vUSD;
-
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
     uint256 tradeVusdValue;
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
-
-    if(tokenStatus[tokenIn]==2){
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-    }else{
-      uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      IERC20(tokenIn).safeTransferFrom(msg.sender, address(monoXPool), amountIn);
-      uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
-      require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
+    
+    if(from != monoXPool.getWETHAddr()) {
+      if(tokenStatus[tokenIn]==2){
+        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
+      }else{
+        uint256 balanceIn0 = IERC20(tokenIn).balanceOf(address(monoXPool));
+        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
+        uint256 balanceIn1 = IERC20(tokenIn).balanceOf(address(monoXPool));
+        require(amountIn >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
+      }
     }
+
+    IvUSD vusdLocal = vUSD;
 
     uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
 

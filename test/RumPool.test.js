@@ -1,7 +1,10 @@
 const { ethers, assert, upgrades } = require("hardhat");
 const { expect } = require("chai");
 const { expectRevert, time } = require('@openzeppelin/test-helpers');
+const { deployContract, MockProvider, solidity } = require('ethereum-waffle');
 
+const Web3 = require('web3');
+const { utils } = Web3;
 
 const e18 = 1 + '0'.repeat(18)
 const e26 = 1 + '0'.repeat(26)
@@ -18,6 +21,7 @@ const PoolStatus = {
 const overrides = {
     gasLimit: 9500000
 }
+const DEFAULT_ETH_AMOUNT = 10000000000
 
 describe('OptionVaultPair', function () {
     before(async function () {
@@ -32,6 +36,7 @@ describe('OptionVaultPair', function () {
         this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vUSD = await ethers.getContractFactory('VUSD');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
+        
     })
     
     beforeEach(async function () {
@@ -106,6 +111,29 @@ describe('OptionVaultPair', function () {
         const daiPool = await this.pool.pools(this.dai.address);
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
+    it('should purchase and sell ERC-20 successfully - 2', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            bigNum(1), bigNum(200), this.bob.address, deadline)
+
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address);
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(290)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -199,6 +227,23 @@ describe('OptionVaultPair', function () {
         console.log(smallNum(devFee.toString()))
     });
 
+    it('should add and remove liquidity ETH successfully', async function () {
+
+        const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        await this.pool.connect(this.bob).addLiquidityETH( 
+            bigNum(1000000),  this.bob.address);
+        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
+
+        const results = await this.pool.connect(this.alice).removeLiquidityETH(
+            liquidity, this.alice.address, 0, 0);
+
+        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(1) // consider gas fee
+        expect(smallNum(vusdAmount.toString())).to.equal(0)
+    });
+
     it('should list new tokens successfully', async function () {
 
         const deadline = (await time.latest()) + 10000
@@ -242,8 +287,8 @@ describe('OptionVaultPair', function () {
     });
 
     it('should purchase and sell ETH successfully - swapExactETHForToken', async function () {
-
         const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
 
         await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
             bigNum(400), this.bob.address, deadline, 
@@ -251,13 +296,48 @@ describe('OptionVaultPair', function () {
             )
 
         const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
         
 
         const daiPool = await this.pool.pools(this.dai.address);
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(2)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(3)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
+    it('should purchase and sell ETH successfully - swapExactETHForToken - 2', async function () {
+        const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+
+        await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
+            bigNum(200), this.bob.address, deadline, 
+            { ...overrides, value: bigNum(1) }
+            )
+
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
+        
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(250)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -268,17 +348,58 @@ describe('OptionVaultPair', function () {
 
     it('should purchase and sell ERC-20 successfully - swapETHForExactToken', async function () {
         const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+
         await this.pool.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
-            bigNum(2), bigNum(590), this.bob.address, deadline)
+            bigNum(2), bigNum(590), this.bob.address, deadline,
+            { ...overrides, value: bigNum(2) }
+            )
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
 
         const daiPool = await this.pool.pools(this.dai.address);
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+        
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1.9)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
+
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
+        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+    });
+
+    it('should purchase and sell ERC-20 successfully - swapETHForExactToken - 2', async function () {
+        const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+
+        await this.pool.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(1), bigNum(295), this.bob.address, deadline,
+            { ...overrides, value: bigNum(1) }
+            )
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
+
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(250)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
+        
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(0.9)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(1)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -289,43 +410,94 @@ describe('OptionVaultPair', function () {
 
     it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
         const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
         await this.pool.connect(this.bob).swapExactTokenForETH(
             this.dai.address, 
             bigNum(610), bigNum(2), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
-
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
         const daiPool = await this.pool.pools(this.dai.address);
-        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-650)
-        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
+        expect(10000000 - smallNum(await daiAmount.toString())).to.equal(610)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(2)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(3)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
+    });
 
+    it('should purchase and sell ERC-20 successfully - swapExactTokenForETH - 2', async function () {
+        const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.dai.address, 
+            bigNum(305), bigNum(1), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(10000000 - smallNum(await daiAmount.toString())).to.equal(305)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
+    });
+    
+    it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
+        const deadline = (await time.latest()) + 10000
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        await this.pool.connect(this.bob).swapTokenForExactETH(
+            this.dai.address, 
+            bigNum(610), bigNum(2), this.bob.address, deadline)
+        
+        const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
+
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
+        const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-610)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1.9)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
 
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
     });
 
-    it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
+    it('should purchase and sell ERC-20 successfully - swapTokenforExactETH - 2', async function () {
         const deadline = (await time.latest()) + 10000
-        await this.pool.connect(this.bob).swapETHForExactToken(
+        const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        await this.pool.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
-            bigNum(2), bigNum(590), this.bob.address, deadline)
+            bigNum(305), bigNum(1), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
-
+        const ethPool = await this.pool.pools(this.weth.address)
+        const ethAmount = await ethers.provider.getBalance(this.bob.address)
         const daiPool = await this.pool.pools(this.dai.address);
-        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
-        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-305)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-300)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(0.9)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(1)
+        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
+        expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
 
-        expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
-        expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
-
-        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
-        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+        expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
     });
 
 });
