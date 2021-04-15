@@ -377,7 +377,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   ) external virtual payable ensure(deadline) returns (uint amountOut) {
     TransferHelper.safeTransferETH(address(monoXPool), msg.value);
     monoXPool.depositWETH(msg.value);
-    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, monoXPool.getWETHAddr(), to, msg.value);
+    amountOut = swapIn(monoXPool.getWETHAddr(), tokenOut, address(this), to, msg.value);
     require(amountOut >= amountOutMin, 'Monoswap: INSUFFICIENT_OUTPUT_AMOUNT');
   }
   
@@ -403,7 +403,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   ) external virtual payable ensure(deadline) returns (uint amountIn) {
     TransferHelper.safeTransferETH(address(monoXPool), msg.value);
     monoXPool.depositWETH(msg.value);
-    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, monoXPool.getWETHAddr(), to, amountOut);
+    amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, address(this), to, amountOut);
     require(amountIn < msg.value, 'Monoswap: WRONG_INPUT_AMOUNT');
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
     
@@ -646,7 +646,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 amountIn) public lockToken(tokenIn) returns(uint256 amountOut)  {
 
 
-    if(from != monoXPool.getWETHAddr()) {
+    if(from != address(this)) {
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
@@ -703,7 +703,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tradeVusdValue;
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
     
-    if(from != monoXPool.getWETHAddr()) {
+    if(from != address(this)) {
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
