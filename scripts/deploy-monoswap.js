@@ -3,7 +3,7 @@ const { ethers, upgrades } = require("hardhat");
 const Web3 = require('web3');
 const { utils } = Web3;
 async function main() {
-
+  
   const [deployer] = await ethers.getSigners();
 
   console.log(
@@ -53,9 +53,8 @@ async function main() {
       weth.address
     ],
   })
-
-  const oz_monoswap = require("../.openzeppelin/ropsten.json")
-  // const oz_monoswap = require("../.openzeppelin/mainnet.json")
+  const networkName = (await ethers.provider.getNetwork()).name;
+  const oz_monoswap = require("../.openzeppelin/" + networkName + ".json")
   const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
   console.log('Monoswap Impl Address', monoswapImplAddress)
   await hre.run("verify:verify", {
