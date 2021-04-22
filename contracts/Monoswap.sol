@@ -31,7 +31,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 fees; // over 1e5, 300 means 0.3%
   uint16 devFee; // over 1e5, 50 means 0.05%
 
-  uint256 constant MINIMUM_LIQUIDITY=1e3;
+  uint256 constant MINIMUM_LIQUIDITY=100;
 
   struct PoolInfo {
     uint256 pid;
@@ -235,6 +235,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     if(_totalSupply==0){
       liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
+      mint(owner(), pool.pid, MINIMUM_LIQUIDITY); // sorry, oz doesn't allow minting to address(0)
     }else{
       liquidity = _totalSupply.mul(liquidityVusdValue).div(poolValue);
     }
