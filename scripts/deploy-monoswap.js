@@ -33,7 +33,6 @@ async function main() {
   }
   const vusd = await VUSD.deploy()
   console.log("VUSD address:", vusd.address)
-  await vusd.deployed()
   const monoXPool = await MonoXPool.deploy(WETH)
   console.log("MonoXPool address:", monoXPool.address)
   const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vusd.address])
@@ -56,10 +55,10 @@ async function main() {
   await hre.run("verify:verify", {
     address: monoXPool.address,
     constructorArguments: [
-      weth.address
+      WETH
     ],
   })
-  const oz_monoswap = require("../.openzeppelin/" + networkName + ".json")
+  const oz_monoswap = require("../.openzeppelin/" + network + ".json")
   const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
   console.log("Monoswap Impl Address", monoswapImplAddress)
   await hre.run("verify:verify", {
