@@ -536,6 +536,20 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
   }
 
+  function directSwapAllowed(address tokenIn, address tokenOut,bool getsAmountOut) public view returns(bool){
+      uint tokenInPoolPrice         = pools[tokenIn].price;
+      uint tokenOutPoolPrice        = pools[tokenOut].price;
+      uint tokenInPoolTokenBalance  = pools[tokenIn].tokenBalance;
+      uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
+      uint tokenInValue             = tokenInPoolTokenBalance.mul(tokenInPoolPrice).div(1e18);
+      uint tokenOutValue            = tokenOutPoolTokenBalance.mul(tokenOutPoolPrice).div(1e18);
+      PoolStatus status             = getsAmountOut?pools[tokenOut].status:pools[tokenIn].status;
+      bool priceExists              = getsAmountOut?tokenInPoolPrice>0:tokenOutPoolPrice>0;
+
+      return priceExists&&status==PoolStatus.OFFICIAL&&tokenInValue>0&&tokenOutValue>0&&
+        (tokenInValue/tokenOutValue==tokenOutValue/tokenInValue);
+  }
+
   // view func to compute amount required for tokenIn to get fixed amount of tokenOut
   function getAmountIn(address tokenIn, address tokenOut, 
     uint256 amountOut) public view returns (uint256 tokenInPrice, uint256 tokenOutPrice, 
@@ -573,14 +587,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint tokenInPoolTokenBalance = pools[tokenIn].tokenBalance;
       require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
 
-      uint256 preliminaryAmountIn = tradeVusdValue.add(tokenInPoolTokenBalance.mul(tokenInPoolPrice).div(1e18));
-      preliminaryAmountIn = tradeVusdValue.mul(tokenInPoolTokenBalance).div(preliminaryAmountIn);
+      amountIn = tradeVusdValue.add(tokenInPoolTokenBalance.mul(tokenInPoolPrice).div(1e18));
+      amountIn = tradeVusdValue.mul(tokenInPoolTokenBalance).div(amountIn);
+
+      bool allowDirectSwap=directSwapAllowed(tokenIn,tokenOut,false);
 
       // assuming p1*p2 = k, equivalent to uniswap's x * y = k
-      uint directSwapTokenInPrice = tokenOutPoolPrice>0&&tokenInPoolStatus==PoolStatus.OFFICIAL?tokenOutPoolPrice.mul(tokenInPoolPrice).div(tokenOutPrice):1;
+      uint directSwapTokenInPrice = allowDirectSwap?tokenOutPoolPrice.mul(tokenInPoolPrice).div(tokenOutPrice):1;
 
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
-        preliminaryAmountIn, TxType.SELL);
+        amountIn, TxType.SELL);
 
       tokenInPrice = directSwapTokenInPrice > tokenInPrice?directSwapTokenInPrice:tokenInPrice;
 
@@ -627,20 +643,23 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
       require (tokenOutPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
       
-      uint256 preliminaryAmountOut = tradeVusdValue.add(tokenOutPoolTokenBalance.mul(tokenOutPoolPrice).div(1e18));
-      preliminaryAmountOut = tradeVusdValue.mul(tokenOutPoolTokenBalance).div(preliminaryAmountOut);
+      amountOut = tradeVusdValue.add(tokenOutPoolTokenBalance.mul(tokenOutPoolPrice).div(1e18));
+      amountOut = tradeVusdValue.mul(tokenOutPoolTokenBalance).div(amountOut);
+
+      bool allowDirectSwap=directSwapAllowed(tokenIn,tokenOut,true);
 
       // assuming p1*p2 = k, equivalent to uniswap's x * y = k
-      uint directSwapTokenOutPrice = tokenInPoolPrice>0&&tokenOutPoolStatus==PoolStatus.OFFICIAL?tokenInPoolPrice.mul(tokenOutPoolPrice).div(tokenInPrice):uint(-1);
+      uint directSwapTokenOutPrice = allowDirectSwap?tokenInPoolPrice.mul(tokenOutPoolPrice).div(tokenInPrice):uint(-1);
 
       // prevent the attack where user can use a small pool to update price in a much larger pool
       tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
-        preliminaryAmountOut, TxType.BUY);
+        amountOut, TxType.BUY);
       tokenOutPrice = directSwapTokenOutPrice < tokenOutPrice?directSwapTokenOutPrice:tokenOutPrice;
 
       amountOut = tradeVusdValue.mul(1e18).div(_getAvgPrice(tokenOutPoolPrice, tokenOutPrice));
     }
   }
+
 
   // swap from tokenIn to tokenOut with fixed tokenIn amount.
   function swapIn (address tokenIn, address tokenOut, address from, address to,
