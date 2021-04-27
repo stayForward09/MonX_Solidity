@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.7.6;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
