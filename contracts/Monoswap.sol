@@ -173,6 +173,17 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     monoXPool.burn(account, id, amount);
   }
 
+  function rebalancePool(address _token,uint256 vusdIn) public onlyOwner{
+      PoolInfo memory pool = pools[_token];
+      require(vusdIn <= pool.vusdDebt,"Only debt can be balanced by the owner");
+      uint tokensValue = pool.tokenBalance * pool.price;
+      require(tokensValue < vusdIn);
+      uint rebalancedAmount = vusdIn.div(pool.price);
+
+      _syncPoolInfo(_token, vusdIn, 0);
+      monoXPool.safeTransferERC20Token(_token, msg.sender, rebalancedAmount);
+  }
+
   // creates a pool
   function _createPool (address _token, uint112 _price, PoolStatus _status) lock internal returns(uint256 _pid)  {
     require(tokenPoolStatus[_token]==0, "Monoswap: Token Exists");
