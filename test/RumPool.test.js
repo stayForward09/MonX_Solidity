@@ -296,7 +296,7 @@ describe('OptionVaultPair', function () {
             )
 
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -307,7 +307,7 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(2)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(3)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.equal(1000000 + 2)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -326,7 +326,7 @@ describe('OptionVaultPair', function () {
             )
 
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -337,7 +337,7 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.equal(1000000 + 1)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -357,7 +357,7 @@ describe('OptionVaultPair', function () {
             )
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -368,7 +368,8 @@ describe('OptionVaultPair', function () {
         
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1.9)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000 + 1)
+        expect(smallNum(await wethAmount.toString())).to.lessThan(1000000 + 2)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -416,7 +417,7 @@ describe('OptionVaultPair', function () {
             bigNum(610), bigNum(2), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -424,7 +425,8 @@ describe('OptionVaultPair', function () {
         expect(10000000 - smallNum(await daiAmount.toString())).to.equal(610)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(2)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(3)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.lessThan(1000000 - 2)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000 - 3)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
@@ -438,7 +440,7 @@ describe('OptionVaultPair', function () {
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -446,7 +448,8 @@ describe('OptionVaultPair', function () {
         expect(10000000 - smallNum(await daiAmount.toString())).to.equal(305)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.lessThan(1000000 - 1)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000 - 2)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
@@ -460,7 +463,7 @@ describe('OptionVaultPair', function () {
             bigNum(610), bigNum(2), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -469,7 +472,7 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1.9)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 2)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
 
@@ -484,7 +487,7 @@ describe('OptionVaultPair', function () {
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
-        const wethAmount = await this.weth.balanceOf(this.bob.address)
+        const wethAmount = await this.weth.balanceOf(this.monoXPool.address)
 
         const ethPool = await this.pool.pools(this.weth.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
@@ -493,7 +496,7 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-300)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(0.9)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(1)
-        expect(smallNum(await wethAmount.toString())).to.equal(10000000)
+        expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 1)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
 

@@ -700,7 +700,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     if(tokenOut==address(vusdLocal)){
       vusdLocal.mint(to, amountOut);
     }else{
-      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
+      if (to != monoXPool.getWETHAddr())
+        monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
@@ -753,7 +754,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to sell side
       _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
     }else{
-      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
+      if (to != monoXPool.getWETHAddr())
+        monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
