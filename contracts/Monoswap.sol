@@ -526,8 +526,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
-      uint256 _vusdIn, uint256 _vusdOut) internal {
-    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
+      uint256 _vusdIn, uint256 _vusdOut, uint256 _exemptionBalance) internal {
+    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool)) - _exemptionBalance;
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(_balance);
@@ -677,7 +677,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     IvUSD vusdLocal = vUSD;
     
-    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
+    // uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
 
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
@@ -685,7 +685,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     (tokenInPrice, tokenOutPrice, amountOut, tradeVusdValue) = getAmountOut(tokenIn, tokenOut, amountIn);
 
-    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
+    uint256 oneSideFeesInVusd = tokenInPrice.mul(amountIn.mul(fees)/2e5)/1e18;
 
     // trading in
     if(tokenIn==address(vusdLocal)){
@@ -693,15 +693,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to the other side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
-      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
     // trading out
     if(tokenOut==address(vusdLocal)){
       vusdLocal.mint(to, amountOut);
     }else{
-      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
-      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
+      if (to != monoXPool.getWETHAddr())
+        monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
+      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0, to != monoXPool.getWETHAddr() ? 0 : amountOut);
     }
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
@@ -734,9 +735,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     IvUSD vusdLocal = vUSD;
 
-    uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
+    // uint256 halfFeesInTokenIn = amountIn.mul(fees)/2e5;
 
-    uint256 oneSideFeesInVusd = tokenInPrice.mul(halfFeesInTokenIn)/1e18;
+    uint256 oneSideFeesInVusd = tokenInPrice.mul(amountIn.mul(fees)/2e5)/1e18;
 
     // trading in
     if(tokenIn==address(vusdLocal)){
@@ -744,7 +745,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to buy side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
     }else{
-      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd));
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
     // trading out
@@ -753,8 +754,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // all fees go to sell side
       _updateVusdBalance(tokenIn, oneSideFeesInVusd, 0);
     }else{
-      monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
-      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0);
+      if (to != monoXPool.getWETHAddr())
+        monoXPool.safeTransferERC20Token(tokenOut, to, amountOut);
+      _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0, to != monoXPool.getWETHAddr() ? 0 : amountOut);
     }
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
