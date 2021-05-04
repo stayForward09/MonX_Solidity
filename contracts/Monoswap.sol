@@ -527,7 +527,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
       uint256 _vusdIn, uint256 _vusdOut, uint256 _exemptionBalance) internal {
-    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool)) - _exemptionBalance;
+    uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
+    _balance = _balance.sub(_exemptionBalance);
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(_balance);
