@@ -503,4 +503,36 @@ describe('OptionVaultPair', function () {
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(300)
     });
 
+    it('should prevent the owner from altering the price of an active pair in the last 6000 blocks', async function () {
+        await expectRevert(
+            this.pool.updatePoolPrice(this.weth.address, bigNum(30)),
+            'Monoswap: PoolPriceUpdateLocked',
+          );
+    });
+
+    it('should update last trading block for every trading', async function() {
+        const deadline = (await time.latest()) + 10000
+        let recipt = await this.pool.connect(this.bob).swapTokenForExactETH(
+            this.dai.address, 
+            bigNum(305), bigNum(1), this.bob.address, deadline)
+        
+        let blockNumber = recipt.blockNumber
+        let lastTradedBlock = await this.pool.lastTradedBlock(this.dai.address)
+        assert(lastTradedBlock.eq(blockNumber))
+    })
+
+    it('should allow the admin update pool price after 6000 blocks', async function() {
+        this.timeout(0);
+        const deadline = (await time.latest()) + 10000
+        let recipt = await this.pool.connect(this.bob).swapTokenForExactETH(
+            this.dai.address, 
+            bigNum(305), bigNum(1), this.bob.address, deadline)
+        
+        let blockNumber = recipt.blockNumber
+        await time.advanceBlockTo(blockNumber + 6001)
+        this.pool.updatePoolPrice(this.dai.address, bigNum(2))
+        let poolinfo = await this.pool.pools(this.dai.address)
+        assert(poolinfo.price.eq(bigNum(2)))
+    })
+
 });

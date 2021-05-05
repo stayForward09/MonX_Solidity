@@ -109,6 +109,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   MonoXPool public monoXPool;
   
+  // mapping (token address => block number of the last trade)
+  mapping (address => uint) public lastTradedBlock; 
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -145,6 +147,24 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     pool.status = _status;
   }
   
+  /**
+    @dev update pools price if there were no active trading for the last 6000 blocks
+    @notice Only owner callable, new price can neither be 0 nor be equal to old one
+    @param _token pool identifider (token address)
+    @param _newPrice new price in wei (uint112)
+   */
+  function updatePoolPrice(address _token, uint112 _newPrice) public onlyOwner {
+    require(_newPrice > 0, 'Monoswap: zeroPriceNotAccept');
+    require(tokenPoolStatus[_token] != 0, "Monoswap: PoolNotExist");
+    
+    PoolInfo storage pool = pools[_token];
+    require(pool.price != _newPrice, "Monoswap: SamePriceNotAccept");
+
+    require(block.number > lastTradedBlock[_token].add(6000), "Monoswap: PoolPriceUpdateLocked");
+    pool.price = _newPrice;
+    lastTradedBlock[_token] = block.number;
+  }
+
   function mint (address account, uint256 id, uint256 amount) internal {
     monoXPool.mint(account, id, amount);
   }
@@ -171,6 +191,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     poolSize = _pid.add(1);
     tokenPoolStatus[_token]=1;
+
+    // initialze pool's lasttradingblocknumber as the block number on which the pool is created
+    lastTradedBlock[_token] = block.number;
   }
 
   // creates an official pool
@@ -533,6 +556,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
     pools[_token].tokenBalance = uint112(_balance);
     pools[_token].price = uint112(_price);
+
+    // record last trade's block number in mapping: lastTradedBlock
+    lastTradedBlock[_token] = block.number;
 
     _updateVusdBalance(_token, _vusdIn, _vusdOut);
     
