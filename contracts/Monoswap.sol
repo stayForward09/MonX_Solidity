@@ -158,7 +158,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require(tokenPoolStatus[_token] != 0, "Monoswap: PoolNotExist");
     
     PoolInfo storage pool = pools[_token];
-    require(pool.price != _newPrice, "Monoswap: SamePriceNotAccpet");
+    require(pool.price != _newPrice, "Monoswap: SamePriceNotAccept");
 
     require(block.number > lastTradedBlock[_token].add(6000), "Monoswap: PoolPriceUpdateLocked");
     pool.price = _newPrice;
