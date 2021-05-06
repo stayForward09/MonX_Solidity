@@ -249,7 +249,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vusdAmount, 
     uint256 tokenAmount,
     address from,
-    address to) public returns(uint256 liquidity) {
+    address to) internal returns(uint256 liquidity) {
     require (tokenAmount>0, "Monoswap: Bad Amount");
 
     require(tokenPoolStatus[_token]==1, "Monoswap: No pool");
