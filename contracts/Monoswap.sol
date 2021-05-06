@@ -348,14 +348,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
     uint256 minTokenOut) public returns(uint256 vusdOut, uint256 tokenOut)  {
-    (vusdOut, tokenOut) = removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, false);
+    (vusdOut, tokenOut) = _removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, false);
   }
 
   // actually removes liquidity
-  function removeLiquidityHelper (address _token, uint256 liquidity, address to, 
+  function _removeLiquidityHelper (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
     uint256 minTokenOut,
-    bool isETH) public returns(uint256 vusdOut, uint256 tokenOut)  {
+    bool isETH) internal returns(uint256 vusdOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "Monoswap: Token Not Found");
     PoolInfo memory pool = pools[_token];
     uint256 poolValue;
@@ -392,7 +392,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
     uint256 vusdOut;
     uint256 tokenOut;
-    (vusdOut, tokenOut) = removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, true);
+    (vusdOut, tokenOut) = _removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, true);
     return (vusdOut, tokenOut);
   }
 
