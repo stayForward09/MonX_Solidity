@@ -78,7 +78,9 @@ describe('OptionVaultPair', function () {
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
         await this.pool.connect(this.alice).addLiquidityETH(
-            bigNum(500000), this.alice.address);
+            this.alice.address,
+            { ...overrides, value: bigNum(500000) }
+            );
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
     })
@@ -232,13 +234,14 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
         await this.pool.connect(this.bob).addLiquidityETH( 
-            bigNum(1000000),  this.bob.address);
-        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
+            this.bob.address,
+            { ...overrides, value: bigNum(1000000) }
+            );
+        const liquidity = (await this.pool.balanceOf(this.bob.address, 0)).toString()
+        const results = await this.pool.connect(this.bob).removeLiquidityETH(
+            liquidity, this.bob.address, 0, 0);
 
-        const results = await this.pool.connect(this.alice).removeLiquidityETH(
-            liquidity, this.alice.address, 0, 0);
-
-        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+        let vusdAmount = await this.vusd.balanceOf(this.bob.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(1) // consider gas fee
         expect(smallNum(vusdAmount.toString())).to.equal(0)
