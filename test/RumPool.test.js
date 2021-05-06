@@ -4,6 +4,7 @@ const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const { deployContract, MockProvider, solidity } = require('ethereum-waffle');
 
 const Web3 = require('web3');
+const { BigNumber } = require("ethers");
 const { utils } = Web3;
 
 const e18 = 1 + '0'.repeat(18)
@@ -587,5 +588,58 @@ describe('OptionVaultPair', function () {
         console.log('bob aave before/after exploit',bobAAVEBefore.toString(),bobAAVEAfter.toString());  // we can see that bob removed all (99.99%) the AAVE from the contract
 
     });
+
+    it('should balance the liquidity properly', async function () {
+        const deadline = (await time.latest()) + 10000
+
+        //selling begins
+        //pool has 1000 aave with 100$ price
+       
+
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.aave.address, 
+            "2246570000000000000000", bigNum(2), this.bob.address, deadline)        // huge sellof so that the pool value is 0.0589351766$ after sale
+
+        const bobETHAfterSale =await ethers.provider.getBalance(this.bob.address);
+   
+        const poolInfo = await this.pool.getPool(this.aave.address);
+        console.log('poolinfoBefore',poolInfo.poolValue.toString(),poolInfo.vusdDebt.toString(),poolInfo.vusdCredit.toString(),poolInfo.tokenBalanceVusdValue.toString());
+        expect(poolInfo.vusdDebt.toString()).to.equal('100207967701922338036149');    // debt is 100207967701922338036149
+   
+        const aliceBalanceBeforeRebalancing=await this.aave.balanceOf(this.alice.address);
+        
+        const poolPriceBeforeRebalancing = ((await this.pool.pools(this.aave.address)).price).toString();
+
+        const poolBalanceBeforeRebalancing = ((await this.pool.pools(this.aave.address)).tokenBalance).toString();
+
+        await this.pool.rebalancePool(this.aave.address,'100207967701922338036149');
+
+        const poolInfoAfterBalance = await this.pool.getPool(this.aave.address);  
+        
+        console.log('poolinfoAfter',poolInfoAfterBalance.poolValue.toString(),poolInfoAfterBalance.vusdDebt.toString(),poolInfoAfterBalance.vusdCredit.toString(),poolInfoAfterBalance.tokenBalanceVusdValue.toString());
+
+        const poolPriceAfterRebalancing = ((await this.pool.pools(this.aave.address)).price).toString();
+
+        const poolBalanceAfterRebalancing = ((await this.pool.pools(this.aave.address)).tokenBalance).toString();
+
+        const aliceBalanceAfterRebalancing=await this.aave.balanceOf(this.alice.address);
+
+        console.log('pool price before/after',poolPriceBeforeRebalancing,poolPriceAfterRebalancing);
+
+        console.log('pool balance before/after',poolBalanceBeforeRebalancing,poolBalanceAfterRebalancing);
+
+        console.log('tokens received by owner',aliceBalanceAfterRebalancing-aliceBalanceBeforeRebalancing);
+
+        expect(poolInfoAfterBalance.vusdDebt.toString()).to.equal('0'); //we expect the new debt to be 0
+
+        expect(poolPriceAfterRebalancing).to.equal(poolPriceBeforeRebalancing);
+
+        expect(poolInfoAfterBalance.poolValue.toString()).to.equal(poolInfo.poolValue.toString());  // pool value should remain the same
+
+        
+
+    });
+
+       
 
 });
