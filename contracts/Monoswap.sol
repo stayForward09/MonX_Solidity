@@ -233,7 +233,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenAmount,
     address to) public returns(uint _pid, uint256 liquidity) {
     _pid = _createPool(_token, _price, PoolStatus.LISTED);
-    liquidity = addLiquidityPair(_token, vusdAmount, tokenAmount, to);
+    liquidity = _addLiquidityPair(_token, vusdAmount, tokenAmount, msg.sender, to);
   }
 
   // add liquidity pair to a pool. allows adding vusd.
@@ -241,6 +241,15 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vusdAmount, 
     uint256 tokenAmount,
     address to) public returns(uint256 liquidity) {
+    liquidity = _addLiquidityPair(_token, vusdAmount, tokenAmount, msg.sender, to);
+  }
+
+    // add liquidity pair to a pool. allows adding vusd.
+  function _addLiquidityPair (address _token, 
+    uint256 vusdAmount, 
+    uint256 tokenAmount,
+    address from,
+    address to) internal returns(uint256 liquidity) {
     require (tokenAmount>0, "Monoswap: Bad Amount");
 
     require(tokenPoolStatus[_token]==1, "Monoswap: No pool");
@@ -250,7 +259,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
-    IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
+    if (from != address(this)) 
+      IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
     }
@@ -276,13 +286,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   // add one-sided liquidity to a pool. no vusd
   function addLiquidity (address _token, uint256 _amount, address to) external returns(uint256 liquidity)  {
-    liquidity = addLiquidityPair(_token, 0, _amount, to);
+    liquidity = _addLiquidityPair(_token, 0, _amount, msg.sender, to);
   }  
 
   // add one-sided ETH liquidity to a pool. no vusd
-  function addLiquidityETH (uint256 _amount, address to) external payable returns(uint256 liquidity)  {
+  function addLiquidityETH (address to) external payable returns(uint256 liquidity)  {
+    TransferHelper.safeTransferETH(address(monoXPool), msg.value);
     monoXPool.depositWETH(msg.value);
-    liquidity = addLiquidityPair(monoXPool.getWETHAddr(), 0, _amount, to);
+    liquidity = _addLiquidityPair(monoXPool.getWETHAddr(), 0, msg.value, address(this), to);
   }  
 
   // updates pool vusd balance, token balance and last pool value.
@@ -337,12 +348,19 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
     uint256 minTokenOut) public returns(uint256 vusdOut, uint256 tokenOut)  {
+    (vusdOut, tokenOut) = _removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, false);
+  }
+
+  // actually removes liquidity
+  function _removeLiquidityHelper (address _token, uint256 liquidity, address to, 
+    uint256 minVusdOut, 
+    uint256 minTokenOut,
+    bool isETH) internal returns(uint256 vusdOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "Monoswap: Token Not Found");
     PoolInfo memory pool = pools[_token];
     uint256 poolValue;
     uint256 liquidityIn;
     (poolValue, liquidityIn, vusdOut, tokenOut) = _removeLiquidity(_token, liquidity, to);
-
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     require (vusdOut>=minVusdOut, "Monoswap: Less vUSD than desired");
     require (tokenOut>=minTokenOut, "Monoswap: Less token amount than desired");
@@ -350,8 +368,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     if (vusdOut>0){
       vUSD.mint(to, vusdOut);
     }
-
-    monoXPool.safeTransferERC20Token(_token, to, tokenOut);
+    if (!isETH) {
+      monoXPool.safeTransferERC20Token(_token, to, tokenOut);
+    } else {
+      monoXPool.withdrawWETH(tokenOut);
+      monoXPool.safeTransferETH(to, tokenOut);
+    }
 
     burn(to, pool.pid, liquidityIn);
 
@@ -370,9 +392,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 minTokenOut) external returns(uint256 vusdOut, uint256 tokenOut)  {
     uint256 vusdOut;
     uint256 tokenOut;
-    (vusdOut, tokenOut) = removeLiquidity (monoXPool.getWETHAddr(), liquidity, address(monoXPool), minVusdOut, minTokenOut);
-    monoXPool.withdrawWETH(tokenOut);
-    TransferHelper.safeTransferETH(to, tokenOut);
+    (vusdOut, tokenOut) = _removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, true);
     return (vusdOut, tokenOut);
   }
 
