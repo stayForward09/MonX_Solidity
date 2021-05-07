@@ -348,7 +348,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function removeLiquidity (address _token, uint256 liquidity, address to, 
     uint256 minVusdOut, 
     uint256 minTokenOut) public returns(uint256 vusdOut, uint256 tokenOut)  {
-    (vusdOut, tokenOut) = _removeLiquidityHelper (monoXPool.getWETHAddr(), liquidity, to, minVusdOut, minTokenOut, false);
+    (vusdOut, tokenOut) = _removeLiquidityHelper (_token, liquidity, to, minVusdOut, minTokenOut, false);
   }
 
   // actually removes liquidity
