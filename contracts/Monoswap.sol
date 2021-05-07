@@ -53,12 +53,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   enum PoolStatus {
     UNLISTED,
     LISTED,
-    OFFICIAL
+    OFFICIAL,
+    SYNTHETIC
   }
   
   mapping (address => PoolInfo) public pools;
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
   mapping (address => uint8) public tokenPoolStatus; //0=undefined, 1=exists
+  mapping (address=>bool) public priceAdjusterRole;
 
   uint256 public poolSize;
 
@@ -86,6 +88,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require(deadline >= block.timestamp, 'Monoswap: EXPIRED');
     _;
   }  
+
+  modifier onlySyntheticPool(address _token){
+    require(pools[_token].status==PoolStatus.SYNTHETIC,"only SYNTHETIC pools support this operation");
+    _;
+  }
+
+  modifier onlyPriceAdjuster(){
+    require(priceAdjusterRole[msg.sender]==true,"Only price adjusters can execute this operation");
+    _;
+  }
 
   event AddLiquidity(address indexed provider, 
     uint indexed pid,
@@ -173,15 +185,28 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     monoXPool.burn(account, id, amount);
   }
 
+  function addPriceAdjuster(address account) external onlyOwner{
+    priceAdjusterRole[account]=true;
+  }
+
+  function removePriceAdjuster(address account) external onlyOwner{
+    priceAdjusterRole[account]=false;
+  }
+
+  function setPoolPrice(address _token, uint112 price) public onlyPriceAdjuster onlySyntheticPool(_token){
+    pools[_token].price=price;
+  }
+
   function rebalancePool(address _token,uint256 vusdIn) public onlyOwner{
       PoolInfo memory pool = pools[_token];
+      
       require(vusdIn <= pool.vusdDebt,"Only debt can be balanced by the owner");
       uint tokensValue = pool.tokenBalance * pool.price;
-      require(tokensValue < vusdIn);
-      uint rebalancedAmount = vusdIn.div(pool.price);
-
-      _syncPoolInfo(_token, vusdIn, 0);
+      require(tokensValue >= vusdIn,"vUSD in should be less than overall tokensValue");
+      uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
       monoXPool.safeTransferERC20Token(_token, msg.sender, rebalancedAmount);
+      _syncPoolInfo(_token, vusdIn, 0);
+      
   }
 
   // creates a pool
