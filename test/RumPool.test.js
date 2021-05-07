@@ -124,11 +124,13 @@ describe('OptionVaultPair', function () {
             this.weth.address, this.dai.address, 
             bigNum(2), bigNum(400), this.bob.address, deadline)
 
+        const ethAmount = await this.weth.balanceOf(this.bob.address)
         const daiAmount = await this.dai.balanceOf(this.bob.address)
 
         const ethPool = await this.pool.pools(this.weth.address);
 
         const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await ethAmount.toString())).to.equal(10000000 - 2)
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
 
@@ -137,6 +139,7 @@ describe('OptionVaultPair', function () {
 
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
         expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+
     });
 
     it('should purchase and sell ERC-20 successfully - 2', async function () {
@@ -144,22 +147,25 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.weth.address, this.dai.address, 
-            bigNum(1), bigNum(200), this.bob.address, deadline)
+            this.uni.address, this.dai.address, 
+            bigNum(2), bigNum(55), this.bob.address, deadline)
 
+        const uniAmount = await this.uni.balanceOf(this.bob.address)
         const daiAmount = await this.dai.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
+        const uniPool = await this.pool.pools(this.uni.address);
 
         const daiPool = await this.pool.pools(this.dai.address);
-        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(290)
-        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
+        expect(smallNum(await uniAmount.toString())).to.equal(10000000 - 2)
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(55)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(60)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
 
-        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
-        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+        expect(smallNum(await uniPool.price.toString())).to.greaterThan(20)
+        expect(smallNum(await uniPool.price.toString())).to.lessThan(30)
+
     });
 
     it('should purchase and sell vUSD successfully', async function () {
@@ -167,35 +173,32 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.weth.address, this.vusd.address, 
-            bigNum(20), bigNum(4000),  this.bob.address, deadline)
+            this.uni.address, this.vusd.address, 
+            bigNum(20), bigNum(400),  this.bob.address, deadline)
 
         let vusdbob0 = smallNum((await this.vusd.balanceOf(this.bob.address)).toString())
 
-        expect(vusdbob0).to.greaterThan(5500)
-        expect(vusdbob0).to.lessThan(6000)
+        expect(vusdbob0).to.greaterThan(550)
+        expect(vusdbob0).to.lessThan(600)
         
-        let ethPool = await this.pool.pools(this.weth.address)
-        let ethPrice0 = smallNum(ethPool.price.toString())
+        let uniPool = await this.pool.pools(this.uni.address)
+        let uniPrice0 = smallNum(uniPool.price.toString())
 
-        expect(ethPrice0).to.greaterThan(200)
-        expect(ethPrice0).to.lessThan(300)
-
-        // console.log('ETH price', ethPrice0)
+        expect(uniPrice0).to.greaterThan(20)
+        expect(uniPrice0).to.lessThan(30)
 
         await this.pool.connect(this.bob).swapTokenForExactToken(
-            this.vusd.address, this.weth.address, 
-            bigNum(3500), bigNum(10),  this.bob.address, deadline)
+            this.vusd.address, this.uni.address, 
+            bigNum(350), bigNum(10),  this.bob.address, deadline)
 
         let vusdbob1 = smallNum((await this.vusd.balanceOf( this.bob.address)).toString())
 
-        expect(vusdbob0-vusdbob1).to.greaterThan(3000)
-        expect(vusdbob0-vusdbob1).to.lessThan(3020)
+        expect(vusdbob0-vusdbob1).to.greaterThan(300)
+        expect(vusdbob0-vusdbob1).to.lessThan(302)
 
-        ethPool = await this.pool.pools(this.weth.address)
-        const ethPrice1 = smallNum(ethPool.price.toString())
-        // console.log('ETH price', ethPrice1)
-        expect(ethPrice0).to.lessThan(ethPrice1)
+        uniPool = await this.pool.pools(this.uni.address)
+        const uniPrice1 = smallNum(uniPool.price.toString())
+        expect(uniPrice0).to.lessThan(uniPrice1)
     });
 
     it('should remove liquidity successfully', async function () {
