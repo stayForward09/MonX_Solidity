@@ -43,16 +43,19 @@ describe('OptionVaultPair', function () {
         this.weth = await this.WETH9.deploy();
         this.yfi = await this.MockERC20.deploy('YFI', 'YFI', e26);
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
+        this.uni = await this.MockERC20.deploy('UNI', 'UNI', e26);
         this.vusd = await this.vUSD.deploy();
 
         await this.weth.deposit({value: bigNum(100000000)})
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
+        await this.uni.transfer(this.alice.address, bigNum(10000000))
 
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
+        await this.uni.transfer( this.bob.address, bigNum(10000000))
         this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address])
@@ -65,15 +68,18 @@ describe('OptionVaultPair', function () {
         await this.weth.connect(this.alice).approve(this.pool.address, e26);
         await this.yfi.connect(this.alice).approve(this.pool.address, e26);
         await this.dai.connect(this.alice).approve(this.pool.address, e26);
+        await this.uni.connect(this.alice).approve(this.pool.address, e26);
         await this.vusd.connect(this.alice).approve(this.pool.address, e26);
 
         await this.weth.connect(this.bob).approve(this.pool.address, e26);
         await this.yfi.connect(this.bob).approve(this.pool.address, e26);
         await this.dai.connect(this.bob).approve(this.pool.address, e26);
+        await this.uni.connect(this.bob).approve(this.pool.address, e26);
         await this.vusd.connect(this.bob).approve(this.pool.address, e26);
 
         await this.pool.addOfficialToken(this.weth.address, bigNum(300))
         await this.pool.addOfficialToken(this.dai.address, bigNum(1))
+        await this.pool.addOfficialToken(this.uni.address, bigNum(30))
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -81,7 +87,11 @@ describe('OptionVaultPair', function () {
             this.alice.address,
             { ...overrides, value: bigNum(500000) }
             );
+            
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
+            bigNum(1000000), this.alice.address);
+
+        await this.pool.connect(this.alice).addLiquidity(this.uni.address, 
             bigNum(1000000), this.alice.address);
     })
 
@@ -95,7 +105,15 @@ describe('OptionVaultPair', function () {
 
         ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
-        
+
+        let uniPool = await this.pool.pools(this.uni.address);
+        expect(await uniPool.price.toString()).to.equal(bigNum(30))
+
+        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+            bigNum(1000000),  this.bob.address);
+
+        uniPool = await this.pool.pools(this.uni.address);
+        expect(await uniPool.price.toString()).to.equal(bigNum(30))
     });
 
     it('should purchase and sell ERC-20 successfully', async function () {
