@@ -634,12 +634,25 @@ describe('OptionVaultPair', function () {
 
         expect(poolPriceAfterRebalancing).to.equal(poolPriceBeforeRebalancing);
 
-        //expect(poolInfoAfterBalance.poolValue.toString()).to.equal(poolInfo.poolValue.toString());  // pool value should remain the same. There's an issue here because of the precision
+        expect(parseInt(poolInfoAfterBalance.poolValue.toString())).to.greaterThan(poolInfo.poolValue.toString() - 50);  // pool value should remain the same. There's an issue here because of the precision
+        expect(parseInt(poolInfoAfterBalance.poolValue.toString())).to.lessThan(parseInt(poolInfo.poolValue.toString()) + 50);
+    });
 
-        
+    it('should add price adjuster and adjust price', async function () {
+
+        await this.pool.updatePoolStatus(this.aave.address,3);  //make the pool synthetic
+
+        await this.pool.addPriceAdjuster(this.bob.address);
+        expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
+
+        await this.pool.connect(this.bob).setPoolPrice(this.aave.address,"100000000000");   
+        expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
+
+        await this.pool.removePriceAdjuster(this.bob.address);      //remove role
+        expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(false);
 
     });
 
-       
+
 
 });

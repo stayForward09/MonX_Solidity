@@ -33,6 +33,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 devFee; // over 1e5, 50 means 0.05%
 
   uint256 constant MINIMUM_LIQUIDITY=100;
+  uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
 
   struct PoolInfo {
     uint256 pid;
@@ -119,6 +120,24 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint amountOut
   );
 
+  event PriceAdjusterAdded(
+    address indexed priceAdjuster
+  );
+
+  event PriceAdjusterRemoved(
+    address indexed priceAdjuster
+  );
+
+  event PoolBalanced(
+    address _token,
+    uint vusdIn
+  );
+
+  event SyntheticPoolPriceChanged(
+    address _token,
+    uint112 price
+  );
+
   MonoXPool public monoXPool;
   
   // mapping (token address => block number of the last trade)
@@ -187,14 +206,17 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   function addPriceAdjuster(address account) external onlyOwner{
     priceAdjusterRole[account]=true;
+    emit PriceAdjusterAdded(account);
   }
 
   function removePriceAdjuster(address account) external onlyOwner{
     priceAdjusterRole[account]=false;
+    emit PriceAdjusterRemoved(account);
   }
 
   function setPoolPrice(address _token, uint112 price) public onlyPriceAdjuster onlySyntheticPool(_token){
     pools[_token].price=price;
+    emit SyntheticPoolPriceChanged(_token,price);
   }
 
   function rebalancePool(address _token,uint256 vusdIn) public onlyOwner{
@@ -206,7 +228,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
       monoXPool.safeTransferERC20Token(_token, msg.sender, rebalancedAmount);
       _syncPoolInfo(_token, vusdIn, 0);
-      
+      emit PoolBalanced(_token, vusdIn);
   }
 
   // creates a pool
