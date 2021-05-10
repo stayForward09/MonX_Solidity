@@ -791,8 +791,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to buy side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
-    }else{
+    }else if (from != address(this)) {
       _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd), 0);
+    } else {
+      _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd), msg.value.sub(amountIn));
     }
 
     // trading out
