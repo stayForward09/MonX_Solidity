@@ -33,7 +33,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 devFee; // over 1e5, 50 means 0.05%
 
   uint256 constant MINIMUM_LIQUIDITY=100;
-  uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
+  
 
   struct PoolInfo {
     uint256 pid;
@@ -61,7 +61,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   mapping (address => PoolInfo) public pools;
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
   mapping (address => uint8) public tokenPoolStatus; //0=undefined, 1=exists
-  mapping (address=>bool) public priceAdjusterRole;
+  
 
   uint256 public poolSize;
 
@@ -142,6 +142,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   // mapping (token address => block number of the last trade)
   mapping (address => uint) public lastTradedBlock; 
+
+  uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
+  mapping (address=>bool) public priceAdjusterRole;
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
