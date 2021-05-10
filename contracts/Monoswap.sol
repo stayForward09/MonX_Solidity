@@ -259,7 +259,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
-    if (from != address(this)) 
+    if (from != address(this)) // if it's not ETH
       IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
@@ -446,15 +446,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to,
     uint deadline
   ) external virtual payable ensure(deadline) returns (uint amountIn) {
-    TransferHelper.safeTransferETH(address(monoXPool), msg.value);
-    monoXPool.depositWETH(msg.value);
+    ( , , amountIn, ) = getAmountIn(monoXPool.getWETHAddr(), tokenOut, amountOut);
+    TransferHelper.safeTransferETH(address(monoXPool), amountIn);
+    monoXPool.depositWETH(amountIn);
     amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, address(this), to, amountOut);
     require(amountIn < msg.value, 'Monoswap: WRONG_INPUT_AMOUNT');
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-    
     if (msg.value > amountIn) {
-      monoXPool.withdrawWETH(msg.value - amountIn);
-      monoXPool.safeTransferETH(msg.sender, msg.value - amountIn);
+      TransferHelper.safeTransferETH(msg.sender, msg.value.sub(amountIn));
     }
   }
 
@@ -711,7 +710,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 amountIn) internal lockToken(tokenIn) returns(uint256 amountOut)  {
 
 
-    if(from != address(this)) {
+    if(from != address(this)) { // if it's not ETH
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
@@ -769,7 +768,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tradeVusdValue;
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
     
-    if(from != address(this)) {
+    if(from != address(this)) { // if it's not ETH
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
@@ -791,7 +790,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vusdLocal.burn(address(monoXPool), amountIn);
       // all fees go to buy side
       oneSideFeesInVusd = oneSideFeesInVusd.mul(2);
-    }else{
+    }else {
       _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVusdValue.add(oneSideFeesInVusd), 0);
     }
 
