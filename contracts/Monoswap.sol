@@ -33,6 +33,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint16 devFee; // over 1e5, 50 means 0.05%
 
   uint256 constant MINIMUM_LIQUIDITY=100;
+  
 
   struct PoolInfo {
     uint256 pid;
@@ -53,12 +54,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   enum PoolStatus {
     UNLISTED,
     LISTED,
-    OFFICIAL
+    OFFICIAL,
+    SYNTHETIC
   }
   
   mapping (address => PoolInfo) public pools;
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
   mapping (address => uint8) public tokenPoolStatus; //0=undefined, 1=exists
+  
 
   uint256 public poolSize;
 
@@ -87,6 +90,16 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     _;
   }  
 
+  modifier onlySyntheticPool(address _token){
+    require(pools[_token].status==PoolStatus.SYNTHETIC,"only SYNTHETIC pools support this operation");
+    _;
+  }
+
+  modifier onlyPriceAdjuster(){
+    require(priceAdjusterRole[msg.sender]==true,"Only price adjusters can execute this operation");
+    _;
+  }
+
   event AddLiquidity(address indexed provider, 
     uint indexed pid,
     address indexed token,
@@ -107,10 +120,31 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint amountOut
   );
 
+  event PriceAdjusterAdded(
+    address indexed priceAdjuster
+  );
+
+  event PriceAdjusterRemoved(
+    address indexed priceAdjuster
+  );
+
+  event PoolBalanced(
+    address _token,
+    uint vusdIn
+  );
+
+  event SyntheticPoolPriceChanged(
+    address _token,
+    uint112 price
+  );
+
   MonoXPool public monoXPool;
   
   // mapping (token address => block number of the last trade)
   mapping (address => uint) public lastTradedBlock; 
+
+  uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
+  mapping (address=>bool) public priceAdjusterRole;
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -171,6 +205,33 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   function burn (address account, uint256 id, uint256 amount) internal {
     monoXPool.burn(account, id, amount);
+  }
+
+  function addPriceAdjuster(address account) external onlyOwner{
+    priceAdjusterRole[account]=true;
+    emit PriceAdjusterAdded(account);
+  }
+
+  function removePriceAdjuster(address account) external onlyOwner{
+    priceAdjusterRole[account]=false;
+    emit PriceAdjusterRemoved(account);
+  }
+
+  function setPoolPrice(address _token, uint112 price) public onlyPriceAdjuster onlySyntheticPool(_token){
+    pools[_token].price=price;
+    emit SyntheticPoolPriceChanged(_token,price);
+  }
+
+  function rebalancePool(address _token,uint256 vusdIn) public onlyOwner{
+      PoolInfo memory pool = pools[_token];
+      
+      require(vusdIn <= pool.vusdDebt,"Only debt can be balanced by the owner");
+      uint tokensValue = pool.tokenBalance * pool.price;
+      require(tokensValue >= vusdIn,"vUSD in should be less than overall tokensValue");
+      uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
+      monoXPool.safeTransferERC20Token(_token, msg.sender, rebalancedAmount);
+      _syncPoolInfo(_token, vusdIn, 0);
+      emit PoolBalanced(_token, vusdIn);
   }
 
   // creates a pool
