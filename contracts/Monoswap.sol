@@ -452,8 +452,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     amountIn = swapOut(monoXPool.getWETHAddr(), tokenOut, address(this), to, amountOut);
     require(amountIn < msg.value, 'Monoswap: WRONG_INPUT_AMOUNT');
     require(amountIn <= amountInMax, 'Monoswap: EXCESSIVE_INPUT_AMOUNT');
-    
-    TransferHelper.safeTransferETH(msg.sender, msg.value.sub(amountIn));
+    if (msg.value > amountIn) {
+      TransferHelper.safeTransferETH(msg.sender, msg.value.sub(amountIn));
+    }
   }
 
   function swapTokenForExactETH(
