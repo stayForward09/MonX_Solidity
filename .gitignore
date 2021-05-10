@@ -13,3 +13,4 @@ artifacts
 #artifacts/contracts/Monoswap.sol/IvUSD.dbg.json
 #artifacts/contracts/Monoswap.sol/Monoswap.dbg.json
 #artifacts/contracts/VUSD.sol/VUSD.dbg.json
+.DS_Store
