@@ -241,22 +241,22 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.dai.address, this.weth.address, 
-            bigNum(15000), bigNum(45),  this.bob.address, deadline)
+            this.dai.address, this.uni.address, 
+            bigNum(15000), bigNum(450),  this.bob.address, deadline)
 
-        await this.pool.connect(this.bob).addLiquidity(this.weth.address, 
+        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
             bigNum(1000000),  this.bob.address);
-        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
+        const liquidity = (await this.pool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
 
         const results = await this.pool.connect(this.alice).removeLiquidity(
-            this.weth.address, liquidity, this.alice.address, 0, 0);
+            this.uni.address, liquidity, this.alice.address, 0, 0);
 
         let vusdAmount = await this.vusd.balanceOf(this.alice.address)
 
-        expect(smallNum(vusdAmount.toString())).to.greaterThan(50*250/2)
-        expect(smallNum(vusdAmount.toString())).to.lessThan(50*300/2)
+        expect(smallNum(vusdAmount.toString())).to.greaterThan(500*25/2)
+        expect(smallNum(vusdAmount.toString())).to.lessThan(500*30/2)
 
         let devFee = await this.vusd.balanceOf(this.dev.address)
         console.log(smallNum(devFee.toString()))
