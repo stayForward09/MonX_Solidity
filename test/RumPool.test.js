@@ -44,6 +44,7 @@ describe('OptionVaultPair', function () {
         this.weth = await this.WETH9.deploy();
         this.yfi = await this.MockERC20.deploy('YFI', 'YFI', e26);
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
+        this.uni = await this.MockERC20.deploy('UNI', 'UNI', e26);
         this.aave = await this.MockERC20.deploy('Aave','AAVE',e26); // used to test if exploit is possible at low value of the pool
         this.vusd = await this.vUSD.deploy();
 
@@ -51,11 +52,13 @@ describe('OptionVaultPair', function () {
         await this.weth.transfer(this.alice.address, bigNum(10000000))
         await this.yfi.transfer(this.alice.address, bigNum(10000000))
         await this.dai.transfer(this.alice.address, bigNum(10000000))
+        await this.uni.transfer(this.alice.address, bigNum(10000000))
         await this.aave.transfer(this.alice.address, bigNum(10000000))  //alice will initiate the pool
 
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
+        await this.uni.transfer( this.bob.address, bigNum(10000000))
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
         this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
@@ -69,6 +72,7 @@ describe('OptionVaultPair', function () {
         await this.weth.connect(this.alice).approve(this.pool.address, e26);
         await this.yfi.connect(this.alice).approve(this.pool.address, e26);
         await this.dai.connect(this.alice).approve(this.pool.address, e26);
+        await this.uni.connect(this.alice).approve(this.pool.address, e26);
         await this.aave.connect(this.alice).approve(this.pool.address, e26);    //alice approval
         await this.aave.approve(this.pool.address, e26);    //owner approval
         await this.vusd.connect(this.alice).approve(this.pool.address, e26);
@@ -76,12 +80,14 @@ describe('OptionVaultPair', function () {
         await this.weth.connect(this.bob).approve(this.pool.address, e26);
         await this.yfi.connect(this.bob).approve(this.pool.address, e26);
         await this.dai.connect(this.bob).approve(this.pool.address, e26);
+        await this.uni.connect(this.bob).approve(this.pool.address, e26);
         await this.vusd.connect(this.bob).approve(this.pool.address, e26);
         await this.aave.connect(this.bob).approve(this.pool.address, e26);    //bob approval
 
         await this.pool.addOfficialToken(this.weth.address, bigNum(300))
         await this.pool.addOfficialToken(this.dai.address, bigNum(1))
         await this.pool.addOfficialToken(this.aave.address, bigNum(100))    // aave price starts at 100
+        await this.pool.addOfficialToken(this.uni.address, bigNum(30))
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -89,11 +95,15 @@ describe('OptionVaultPair', function () {
             this.alice.address,
             { ...overrides, value: bigNum(500000) }
             );
+            
         await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
 
         await this.pool.connect(this.alice).addLiquidity(this.aave.address, 
             bigNum(1000), this.alice.address);       // 1000 aave is added by alice
+
+        await this.pool.connect(this.alice).addLiquidity(this.uni.address, 
+            bigNum(1000000), this.alice.address);
         
     })
 
@@ -107,7 +117,15 @@ describe('OptionVaultPair', function () {
 
         ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
-        
+
+        let uniPool = await this.pool.pools(this.uni.address);
+        expect(await uniPool.price.toString()).to.equal(bigNum(30))
+
+        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+            bigNum(1000000),  this.bob.address);
+
+        uniPool = await this.pool.pools(this.uni.address);
+        expect(await uniPool.price.toString()).to.equal(bigNum(30))
     });
 
     it('should purchase and sell ERC-20 successfully', async function () {
@@ -118,11 +136,13 @@ describe('OptionVaultPair', function () {
             this.weth.address, this.dai.address, 
             bigNum(2), bigNum(400), this.bob.address, deadline)
 
+        const ethAmount = await this.weth.balanceOf(this.bob.address)
         const daiAmount = await this.dai.balanceOf(this.bob.address)
 
         const ethPool = await this.pool.pools(this.weth.address);
 
         const daiPool = await this.pool.pools(this.dai.address);
+        expect(smallNum(await ethAmount.toString())).to.equal(10000000 - 2)
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(550)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
 
@@ -131,6 +151,7 @@ describe('OptionVaultPair', function () {
 
         expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
         expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+
     });
 
     it('should purchase and sell ERC-20 successfully - 2', async function () {
@@ -138,22 +159,25 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.weth.address, this.dai.address, 
-            bigNum(1), bigNum(200), this.bob.address, deadline)
+            this.uni.address, this.dai.address, 
+            bigNum(2), bigNum(55), this.bob.address, deadline)
 
+        const uniAmount = await this.uni.balanceOf(this.bob.address)
         const daiAmount = await this.dai.balanceOf(this.bob.address)
 
-        const ethPool = await this.pool.pools(this.weth.address);
+        const uniPool = await this.pool.pools(this.uni.address);
 
         const daiPool = await this.pool.pools(this.dai.address);
-        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(290)
-        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
+        expect(smallNum(await uniAmount.toString())).to.equal(10000000 - 2)
+        expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(55)
+        expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(60)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
 
-        expect(smallNum(await ethPool.price.toString())).to.greaterThan(200)
-        expect(smallNum(await ethPool.price.toString())).to.lessThan(300)
+        expect(smallNum(await uniPool.price.toString())).to.greaterThan(20)
+        expect(smallNum(await uniPool.price.toString())).to.lessThan(30)
+
     });
 
     it('should purchase and sell vUSD successfully', async function () {
@@ -161,35 +185,32 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.weth.address, this.vusd.address, 
-            bigNum(20), bigNum(4000),  this.bob.address, deadline)
+            this.uni.address, this.vusd.address, 
+            bigNum(20), bigNum(400),  this.bob.address, deadline)
 
         let vusdbob0 = smallNum((await this.vusd.balanceOf(this.bob.address)).toString())
 
-        expect(vusdbob0).to.greaterThan(5500)
-        expect(vusdbob0).to.lessThan(6000)
+        expect(vusdbob0).to.greaterThan(550)
+        expect(vusdbob0).to.lessThan(600)
         
-        let ethPool = await this.pool.pools(this.weth.address)
-        let ethPrice0 = smallNum(ethPool.price.toString())
+        let uniPool = await this.pool.pools(this.uni.address)
+        let uniPrice0 = smallNum(uniPool.price.toString())
 
-        expect(ethPrice0).to.greaterThan(200)
-        expect(ethPrice0).to.lessThan(300)
-
-        // console.log('ETH price', ethPrice0)
+        expect(uniPrice0).to.greaterThan(20)
+        expect(uniPrice0).to.lessThan(30)
 
         await this.pool.connect(this.bob).swapTokenForExactToken(
-            this.vusd.address, this.weth.address, 
-            bigNum(3500), bigNum(10),  this.bob.address, deadline)
+            this.vusd.address, this.uni.address, 
+            bigNum(350), bigNum(10),  this.bob.address, deadline)
 
         let vusdbob1 = smallNum((await this.vusd.balanceOf( this.bob.address)).toString())
 
-        expect(vusdbob0-vusdbob1).to.greaterThan(3000)
-        expect(vusdbob0-vusdbob1).to.lessThan(3020)
+        expect(vusdbob0-vusdbob1).to.greaterThan(300)
+        expect(vusdbob0-vusdbob1).to.lessThan(302)
 
-        ethPool = await this.pool.pools(this.weth.address)
-        const ethPrice1 = smallNum(ethPool.price.toString())
-        // console.log('ETH price', ethPrice1)
-        expect(ethPrice0).to.lessThan(ethPrice1)
+        uniPool = await this.pool.pools(this.uni.address)
+        const uniPrice1 = smallNum(uniPool.price.toString())
+        expect(uniPrice0).to.lessThan(uniPrice1)
     });
 
     it('should remove liquidity successfully', async function () {
@@ -220,22 +241,22 @@ describe('OptionVaultPair', function () {
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.dai.address, this.weth.address, 
-            bigNum(15000), bigNum(45),  this.bob.address, deadline)
+            this.dai.address, this.uni.address, 
+            bigNum(15000), bigNum(450),  this.bob.address, deadline)
 
-        await this.pool.connect(this.bob).addLiquidity(this.weth.address, 
+        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
             bigNum(1000000),  this.bob.address);
-        const liquidity = (await this.pool.balanceOf(this.alice.address, 0)).toString()
+        const liquidity = (await this.pool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
 
         const results = await this.pool.connect(this.alice).removeLiquidity(
-            this.weth.address, liquidity, this.alice.address, 0, 0);
+            this.uni.address, liquidity, this.alice.address, 0, 0);
 
         let vusdAmount = await this.vusd.balanceOf(this.alice.address)
 
-        expect(smallNum(vusdAmount.toString())).to.greaterThan(50*250/2)
-        expect(smallNum(vusdAmount.toString())).to.lessThan(50*300/2)
+        expect(smallNum(vusdAmount.toString())).to.greaterThan(500*25/2)
+        expect(smallNum(vusdAmount.toString())).to.lessThan(500*30/2)
 
         let devFee = await this.vusd.balanceOf(this.dev.address)
         console.log(smallNum(devFee.toString()))
@@ -583,9 +604,9 @@ describe('OptionVaultPair', function () {
         await this.pool.connect(this.bob).removeLiquidity(
             this.aave.address, bobAaveLPAfter, this.bob.address, 0, 0);
 
-        const bobAAVEAfter=await this.aave.balanceOf(this.bob.address)
+        // const bobAAVEAfter=await this.aave.balanceOf(this.bob.address)
 
-        console.log('bob aave before/after exploit',bobAAVEBefore.toString(),bobAAVEAfter.toString());  // we can see that bob removed all (99.99%) the AAVE from the contract
+        // console.log('bob aave before/after exploit',bobAAVEBefore.toString(),bobAAVEAfter.toString());  // we can see that bob removed all (99.99%) the AAVE from the contract
 
     });
 
