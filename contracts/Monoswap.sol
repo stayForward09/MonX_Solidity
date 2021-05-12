@@ -65,6 +65,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   uint256 public poolSize;
 
+  uint public poolSizeMinLimit;
+
   uint private unlocked;
   modifier lock() {
     require(unlocked == 1, 'Monoswap: LOCKED');
@@ -173,6 +175,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function setDevFee (uint16 _devFee) onlyOwner external {
     require(_devFee<1e3, "devFee too large");
     devFee = _devFee;
+  }
+
+  function setPoolSizeMinLimit(uint _poolSizeMinLimit) onlyOwner external {
+    poolSizeMinLimit = _poolSizeMinLimit;
   }
 
   // update status of a pool. onlyOwner.
@@ -634,6 +640,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     _balance = _balance.sub(_exemptionBalance);
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
+    (uint initialPoolValue, , ,) = getPool(_token);
     pools[_token].tokenBalance = uint112(_balance);
     pools[_token].price = uint112(_price);
 
@@ -641,6 +648,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     lastTradedBlock[_token] = block.number;
 
     _updateVusdBalance(_token, _vusdIn, _vusdOut);
+
+    (uint poolValue, , ,) = getPool(_token);
+
+    require(initialPoolValue <= poolValue || poolValue >= poolSizeMinLimit,
+      "Pool size can't be lower than minimum pool size");
     
   }
 

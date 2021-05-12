@@ -675,5 +675,61 @@ describe('OptionVaultPair', function () {
     });
 
 
+    it('should revert transaction because pool size would be to low - swapExactTokenForToken', async function () {
 
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+    });
+
+    it('should revert and than accept transaction after changing the minimum pool size', async function () {
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+
+        await this.pool.setPoolSizeMinLimit(bigNum(297000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.not.reverted;
+    });
+
+    it('should revert transaction because pool size would be to low - swapExactETHForToken', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactETHForToken(
+            this.dai.address,
+            bigNum(400),
+            this.bob.address,
+            deadline,
+            {...overrides, value: bigNum(10000)}
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+    });
+    
 });
