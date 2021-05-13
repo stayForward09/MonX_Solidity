@@ -65,9 +65,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
 
   uint256 public poolSize;
-
-  uint private unlocked;
-
   uint public poolSizeMinLimit;
 
   modifier lock() {
@@ -149,6 +146,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
   mapping (address=>bool) public priceAdjusterRole;
+
+  uint private unlocked;
+  mapping(address => bool) public pausedPool;
 
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -638,6 +638,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
       uint256 _vusdIn, uint256 _vusdOut, uint256 _exemptionBalance) internal {
+    require(pausedPool[_token]==false,"Monoswap: poolIsPaused");
     uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
     _balance = _balance.sub(_exemptionBalance);
 
@@ -655,9 +656,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     require(initialPoolValue <= poolValue || poolValue >= poolSizeMinLimit,
       "Pool size can't be lower than minimum pool size");
+<<<<<<< HEAD
 
     require(pools[_token].status!=PoolStatus.PAUSED,"Monoswap: poolIsPaused");
     
+=======
+>>>>>>> 9138bf4 (move require at begin in _updateTokenInfo)
   }
 
   function directSwapAllowed(uint tokenInPoolPrice,uint tokenOutPoolPrice, 
