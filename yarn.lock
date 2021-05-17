@@ -976,7 +976,7 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.4.1.tgz#03c891fec7f93be0ae44ed74e57a122a38732ce7"
   integrity sha512-cUriqMauq1ylzP2TxePNdPqkwI7Le3Annh4K9rrpvKfSBB/bdW+Iu1ihBaTIABTAAJ85LmKL5SSPPL9ry8d1gQ==
 
-"@openzeppelin/hardhat-upgrades@^1.6.0":
+"@openzeppelin/hardhat-upgrades@1.6.0":
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/@openzeppelin/hardhat-upgrades/-/hardhat-upgrades-1.6.0.tgz#735e1c70aea859e284937995e238fcfdea7b69d7"
   integrity sha512-4oRB5lH3d5RAUIWKX5wuJvgo06IOgndUoPKYUuLTKW2BmyrMTPc6GZycKf7UCxU0GYeUC9BjsohUAIjqJwMnww==
