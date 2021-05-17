@@ -883,4 +883,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function balanceOf(address account, uint256 id) public view returns (uint256) {
     return monoXPool.balanceOf(account, id);
   }
+
+  function getConfig() public view returns (address _vUSD, address _feeTo, uint16 _fees, uint16 _devFee) {
+    _vUSD = address(vUSD);
+    _feeTo = feeTo;
+    _fees = fees;
+    _devFee = devFee;
+  }
 }
