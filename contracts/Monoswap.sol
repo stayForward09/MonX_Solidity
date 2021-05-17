@@ -320,8 +320,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
+    uint256 balanceIn0;
+    uint256 balanceIn1;
     if (from != address(this)) // if it's not ETH
+      balanceIn0 = IERC20(_token).balanceOf(address(monoXPool));
       IERC20(_token).safeTransferFrom(msg.sender, address(monoXPool), tokenAmount);
+      balanceIn1 = IERC20(_token).balanceOf(address(monoXPool));
+      tokenAmount =  balanceIn1.sub(balanceIn0);
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
     }
