@@ -107,6 +107,13 @@ describe('OptionVaultPair', function () {
         
     })
 
+    it("should set correct state variables", async function () {
+        const config = await this.pool.getConfig()
+        expect(config._vUSD).to.equal(this.vusd.address)
+        expect(config._feeTo).to.equal(this.dev.address)
+        expect(config._fees).to.equal(300)
+        expect(config._devFee).to.equal(50)
+    });
 
     it('should add liquidity successfully', async function () {
         let ethPool = await this.pool.pools(this.weth.address);
