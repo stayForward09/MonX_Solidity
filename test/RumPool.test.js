@@ -675,5 +675,88 @@ describe('OptionVaultPair', function () {
     });
 
 
+    it('should revert transaction because pool size would be to low - swapExactTokenForToken', async function () {
 
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+    });
+
+    it('should revert and than accept transaction after changing the minimum pool size', async function () {
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+
+        await this.pool.setPoolSizeMinLimit(bigNum(297000000));
+
+        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address,
+            this.dai.address,
+            bigNum(10000),
+            bigNum(400),
+            this.bob.address,
+            deadline
+        )).to.be.not.reverted;
+    });
+
+    it('should revert transaction because pool size would be to low - swapExactETHForToken', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.setPoolSizeMinLimit(bigNum(298000000));
+
+        await expect(this.pool.connect(this.bob).swapExactETHForToken(
+            this.dai.address,
+            bigNum(400),
+            this.bob.address,
+            deadline,
+            {...overrides, value: bigNum(10000)}
+        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+    });
+
+    it('should pause the pool and revert swaps', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.updatePoolStatus(this.dai.address,4);
+
+        await expect(this.pool.connect(this.alice).swapExactETHForToken(
+            this.dai.address,
+            bigNum(400),
+            this.bob.address,
+            deadline,
+            {...overrides, value: bigNum(10000)}
+        )).to.be.revertedWith("Monoswap: poolIsPaused");
+    });
+
+    it('should not allow creating a new pool for paused token', async function () {
+        this.tToken = await this.MockERC20.deploy('Ttoken', 'TK', e26);
+        await this.tToken.approve(this.pool.address, bigNum(10000));
+        await this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address);
+        // pause a pool
+        this.pool.updatePoolStatus(this.tToken.address, 4);
+        // try to list same token as the paused one.
+        await expectRevert(
+            this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address),
+            'Monoswap: Token Exists',
+        );
+    });
 });

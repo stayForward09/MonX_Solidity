@@ -55,7 +55,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     UNLISTED,
     LISTED,
     OFFICIAL,
-    SYNTHETIC
+    SYNTHETIC,
+    PAUSED
   }
   
   mapping (address => PoolInfo) public pools;
@@ -64,8 +65,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
 
   uint256 public poolSize;
+  uint public poolSizeMinLimit;
 
-  uint private unlocked;
   modifier lock() {
     require(unlocked == 1, 'Monoswap: LOCKED');
     unlocked = 0;
@@ -146,6 +147,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint256 constant MINIMUM_POOL_VALUE = 10000 * 1e18;
   mapping (address=>bool) public priceAdjusterRole;
 
+  uint private unlocked;
+  mapping(address => bool) public pausedPool;
+
   function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
@@ -173,6 +177,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function setDevFee (uint16 _devFee) onlyOwner external {
     require(_devFee<1e3, "devFee too large");
     devFee = _devFee;
+  }
+
+  function setPoolSizeMinLimit(uint _poolSizeMinLimit) onlyOwner external {
+    poolSizeMinLimit = _poolSizeMinLimit;
   }
 
   // update status of a pool. onlyOwner.
@@ -636,10 +644,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // updates pool token balance and price.
   function _updateTokenInfo (address _token, uint256 _price,
       uint256 _vusdIn, uint256 _vusdOut, uint256 _exemptionBalance) internal {
+    require(pausedPool[_token]==false,"Monoswap: poolIsPaused");
     uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
     _balance = _balance.sub(_exemptionBalance);
 
     require(_price <= uint112(-1) && _balance <= uint112(-1), 'OVERFLOW');
+    (uint initialPoolValue, , ,) = getPool(_token);
     pools[_token].tokenBalance = uint112(_balance);
     pools[_token].price = uint112(_price);
 
@@ -647,6 +657,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     lastTradedBlock[_token] = block.number;
 
     _updateVusdBalance(_token, _vusdIn, _vusdOut);
+
+    (uint poolValue, , ,) = getPool(_token);
+
+    require(initialPoolValue <= poolValue || poolValue >= poolSizeMinLimit,
+      "Pool size can't be lower than minimum pool size");
+
+    require(pools[_token].status!=PoolStatus.PAUSED,"Monoswap: poolIsPaused");
     
   }
 
@@ -820,10 +837,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
     
-    delete tokenInPrice;
-    delete tokenOutPrice;
-    delete tradeVusdValue;
-    delete oneSideFeesInVusd;
   }
 
   
@@ -874,10 +887,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
 
-    delete tokenInPrice;
-    delete tokenOutPrice;
-    delete tradeVusdValue;
-    delete oneSideFeesInVusd;
   }
 
   function balanceOf(address account, uint256 id) public view returns (uint256) {
