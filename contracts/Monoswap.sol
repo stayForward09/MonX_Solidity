@@ -656,12 +656,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     require(initialPoolValue <= poolValue || poolValue >= poolSizeMinLimit,
       "Pool size can't be lower than minimum pool size");
-<<<<<<< HEAD
 
     require(pools[_token].status!=PoolStatus.PAUSED,"Monoswap: poolIsPaused");
     
-=======
->>>>>>> 9138bf4 (move require at begin in _updateTokenInfo)
   }
 
   function directSwapAllowed(uint tokenInPoolPrice,uint tokenOutPoolPrice, 
