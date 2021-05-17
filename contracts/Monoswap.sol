@@ -55,7 +55,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     UNLISTED,
     LISTED,
     OFFICIAL,
-    SYNTHETIC
+    SYNTHETIC,
+    PAUSED
   }
   
   mapping (address => PoolInfo) public pools;
@@ -68,8 +69,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   uint private unlocked;
 
   uint public poolSizeMinLimit;
-
-  mapping(address => bool) public pausedPool;
 
   modifier lock() {
     require(unlocked == 1, 'Monoswap: LOCKED');
@@ -206,16 +205,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require(block.number > lastTradedBlock[_token].add(6000), "Monoswap: PoolPriceUpdateLocked");
     pool.price = _newPrice;
     lastTradedBlock[_token] = block.number;
-  }
-
-  function pausePool(address _token) public onlyOwner{
-    require(tokenPoolStatus[_token] != 0, "Monoswap: PoolNotExist");
-    pausedPool[_token]=true;
-  }
-
-  function unpausePool(address _token) public onlyOwner{
-    require(tokenPoolStatus[_token] != 0, "Monoswap: PoolNotExist");
-    pausedPool[_token]=false;
   }
 
   function mint (address account, uint256 id, uint256 amount) internal {
@@ -667,7 +656,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require(initialPoolValue <= poolValue || poolValue >= poolSizeMinLimit,
       "Pool size can't be lower than minimum pool size");
 
-    require(pausedPool[_token]==false,"Monoswap: poolIsPaused");
+    require(pools[_token].status!=PoolStatus.PAUSED,"Monoswap: poolIsPaused");
     
   }
 
@@ -841,10 +830,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
     
-    delete tokenInPrice;
-    delete tokenOutPrice;
-    delete tradeVusdValue;
-    delete oneSideFeesInVusd;
   }
 
   
@@ -895,10 +880,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
 
-    delete tokenInPrice;
-    delete tokenOutPrice;
-    delete tradeVusdValue;
-    delete oneSideFeesInVusd;
   }
 
   function balanceOf(address account, uint256 id) public view returns (uint256) {

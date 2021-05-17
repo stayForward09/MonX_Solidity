@@ -731,5 +731,20 @@ describe('OptionVaultPair', function () {
             {...overrides, value: bigNum(10000)}
         )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
     });
-    
+
+    it('should pause the pool and revert swaps', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.pool.updatePoolStatus(this.dai.address,4);
+
+        await expect(this.pool.connect(this.alice).swapExactETHForToken(
+            this.dai.address,
+            bigNum(400),
+            this.bob.address,
+            deadline,
+            {...overrides, value: bigNum(10000)}
+        )).to.be.revertedWith("Monoswap: poolIsPaused");
+    });
+
 });
