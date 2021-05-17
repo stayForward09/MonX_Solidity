@@ -747,4 +747,16 @@ describe('OptionVaultPair', function () {
         )).to.be.revertedWith("Monoswap: poolIsPaused");
     });
 
+    it('should not allow creating a new pool for paused token', async function () {
+        this.tToken = await this.MockERC20.deploy('Ttoken', 'TK', e26);
+        await this.tToken.approve(this.pool.address, bigNum(10000));
+        await this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address);
+        // pause a pool
+        this.pool.updatePoolStatus(this.tToken.address, 4);
+        // try to list same token as the paused one.
+        await expectRevert(
+            this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address),
+            'Monoswap: Token Exists',
+        );
+    });
 });
