@@ -24,7 +24,7 @@ const overrides = {
 }
 const DEFAULT_ETH_AMOUNT = 10000000000
 
-describe('OptionVaultPair', function () {
+describe('MonoX Core', function () {
     before(async function () {
         this.signers = await ethers.getSigners()
         this.alice = this.signers[0]
