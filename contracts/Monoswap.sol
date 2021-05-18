@@ -346,7 +346,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
     if (from != address(this)) {// if it's not ETH
-      transferAndCheck(msg.sender,address(monoXPool),_token,tokenAmount);
+      tokenAmount = transferAndCheck(msg.sender,address(monoXPool),_token,tokenAmount);
     }
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
@@ -809,7 +809,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
-        transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
+        amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
       }
     }
 
@@ -860,7 +860,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       if(tokenStatus[tokenIn]==2){
         IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
       }else{
-        transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
+        amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
       }
     }
 
@@ -905,11 +905,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   //   _devFee = devFee;
   // }
 
-  function transferAndCheck(address from,address to,address _token,uint amount) internal {
-        uint256 balanceIn0 = IERC20(_token).balanceOf(to);
-        IERC20(_token).safeTransferFrom(from, to, amount);
-        uint256 balanceIn1 = IERC20(_token).balanceOf(to);
-        require(amount >= balanceIn1.sub(balanceIn0), "Monoswap: Not Enough Tokens");
+  function transferAndCheck(address from,address to,address _token,uint amount) internal returns (uint256){
+    uint256 balanceIn0 = IERC20(_token).balanceOf(to);
+    IERC20(_token).safeTransferFrom(from, to, amount);
+    uint256 balanceIn1 = IERC20(_token).balanceOf(to);
+    return balanceIn1.sub(balanceIn0);
   }
-
 }
