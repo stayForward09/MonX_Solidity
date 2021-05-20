@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 import "hardhat/console.sol";
-import "./MonoXPool.sol";
+import "./interfaces/IMonoXPool.sol";
 import './interfaces/IWETH.sol';
 
 interface IvUSD is IERC20 {
@@ -142,7 +142,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     PoolStatus newStatus
   );
 
-  MonoXPool public monoXPool;
+  IMonoXPool public monoXPool;
   
   // mapping (token address => block number of the last trade)
   mapping (address => uint) public lastTradedBlock; 
@@ -153,7 +153,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // ------------
   uint public poolSizeMinLimit;
 
-  function initialize(MonoXPool _monoXPool, IvUSD _vusd) public initializer {
+  function initialize(IMonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vUSD = _vusd;
