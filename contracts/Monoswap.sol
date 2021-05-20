@@ -346,9 +346,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
-    if (from != address(this)) {// if it's not ETH
-      tokenAmount = transferAndCheck(msg.sender,address(monoXPool),_token,tokenAmount);
-    }
+    tokenAmount = transferAndCheck(msg.sender,address(monoXPool),_token,tokenAmount);
+
     if(vusdAmount>0){
       vUSD.safeTransferFrom(msg.sender, address(monoXPool), vusdAmount);
     }
@@ -762,7 +761,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // PoolInfo memory tokenInPool = pools[tokenIn];
       PoolStatus tokenInPoolStatus = pools[tokenIn].status;
       
-
       require (tokenInPoolStatus != PoolStatus.UNLISTED, "Monoswap: Pool Unlisted");
       
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
@@ -804,14 +802,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function swapIn (address tokenIn, address tokenOut, address from, address to,
       uint256 amountIn) internal lockToken(tokenIn) returns(uint256 amountOut)  {
 
-
-    if(from != address(this)) { // if it's not ETH
-      if(tokenStatus[tokenIn]==2){
-        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
-      }else{
-        amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
-      }
-    }
+    amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn); 
 
     IvUSD vusdLocal = vUSD;
     
@@ -856,13 +847,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tradeVusdValue;
     (tokenInPrice, tokenOutPrice, amountIn, tradeVusdValue) = getAmountIn(tokenIn, tokenOut, amountOut);
     
-    if(from != address(this)) { // if it's not ETH
-      if(tokenStatus[tokenIn]==2){
-        IERC20(tokenIn).safeTransferFrom(from, address(monoXPool), amountIn);
-      }else{
-        amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn);        
-      }
-    }
+    amountIn = transferAndCheck(from,address(monoXPool),tokenIn,amountIn);
 
     IvUSD vusdLocal = vUSD;
 
@@ -906,9 +891,20 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // }
 
   function transferAndCheck(address from,address to,address _token,uint amount) internal returns (uint256){
-    uint256 balanceIn0 = IERC20(_token).balanceOf(to);
-    IERC20(_token).safeTransferFrom(from, to, amount);
-    uint256 balanceIn1 = IERC20(_token).balanceOf(to);
-    return balanceIn1.sub(balanceIn0);
+    if(from != address(this)) { // if it's not ETH
+      if(tokenStatus[tokenIn]==2){
+        IERC20(tokenIn).safeTransferFrom(from, to, amount);
+        return amount;
+      }else{
+        uint256 balanceIn0 = IERC20(_token).balanceOf(to);
+        IERC20(_token).safeTransferFrom(from, to, amount);
+        uint256 balanceIn1 = IERC20(_token).balanceOf(to);
+        return balanceIn1.sub(balanceIn0);
+      }
+    }
+
+    return amount;
+
+
   }
 }
