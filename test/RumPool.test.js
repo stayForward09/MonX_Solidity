@@ -549,7 +549,7 @@ describe('MonoX Core', function () {
     it('should prevent the owner from altering the price of an active pair in the last 6000 blocks', async function () {
         await expectRevert(
             this.pool.updatePoolPrice(this.weth.address, bigNum(30)),
-            'Monoswap: PoolPriceUpdateLocked',
+            'MonoX:TOO_EARLY',
           );
     });
 
@@ -695,7 +695,7 @@ describe('MonoX Core', function () {
             bigNum(400),
             this.bob.address,
             deadline
-        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+        )).to.be.revertedWith("MonoX:MIN_POOL_SIZE");
     });
 
     it('should revert and than accept transaction after changing the minimum pool size', async function () {
@@ -710,7 +710,7 @@ describe('MonoX Core', function () {
             bigNum(400),
             this.bob.address,
             deadline
-        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+        )).to.be.revertedWith("MonoX:MIN_POOL_SIZE");
 
         await this.pool.setPoolSizeMinLimit(bigNum(297000000));
 
@@ -736,7 +736,7 @@ describe('MonoX Core', function () {
             this.bob.address,
             deadline,
             {...overrides, value: bigNum(10000)}
-        )).to.be.revertedWith("Pool size can't be lower than minimum pool size");
+        )).to.be.revertedWith("MonoX:MIN_POOL_SIZE");
     });
 
     it('should pause the pool and revert swaps', async function () {
@@ -751,7 +751,7 @@ describe('MonoX Core', function () {
             this.bob.address,
             deadline,
             {...overrides, value: bigNum(10000)}
-        )).to.be.revertedWith("Monoswap: poolIsPaused");
+        )).to.be.revertedWith("MonoX:PAUSED");
     });
 
     it('should not allow creating a new pool for paused token', async function () {
@@ -763,7 +763,7 @@ describe('MonoX Core', function () {
         // try to list same token as the paused one.
         await expectRevert(
             this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address),
-            'Monoswap: Token Exists',
+            'MonoX:POOL_EXISTS',
         );
     });
 });
