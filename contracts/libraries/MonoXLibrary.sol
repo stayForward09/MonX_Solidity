@@ -6,6 +6,12 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 library MonoXLibrary {
   using SafeMath for uint;
 
+  // from https://github.com/Uniswap/uniswap-lib/blob/master/contracts/libraries/TransferHelper.sol
+  function safeTransferETH(address to, uint256 value) internal {
+      (bool success, ) = to.call{value: value}(new bytes(0));
+      require(success, 'TransferHelper::safeTransferETH: ETH transfer failed');
+  }
+
   // util func to manipulate vusd balance
   function vusdBalanceAdd (uint256 _credit, uint256 _debt, 
     uint256 delta) internal pure returns (uint256 _newCredit, uint256 _newDebt) {

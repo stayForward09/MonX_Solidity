@@ -84,10 +84,10 @@ describe('MonoX Core', function () {
         await this.vusd.connect(this.bob).approve(this.pool.address, e26);
         await this.aave.connect(this.bob).approve(this.pool.address, e26);    //bob approval
 
-        await this.pool.addOfficialToken(this.weth.address, bigNum(300))
-        await this.pool.addOfficialToken(this.dai.address, bigNum(1))
-        await this.pool.addSyntheticToken(this.aave.address, bigNum(100))    // aave price starts at 100
-        await this.pool.addOfficialToken(this.uni.address, bigNum(30))
+        await this.pool.addSpecialToken(this.weth.address, bigNum(300), 2)
+        await this.pool.addSpecialToken(this.dai.address, bigNum(1), 2)
+        await this.pool.addSpecialToken(this.aave.address, bigNum(100), 3)    // aave price starts at 100
+        await this.pool.addSpecialToken(this.uni.address, bigNum(30), 2)
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -670,13 +670,13 @@ describe('MonoX Core', function () {
 
         //await this.pool.updatePoolStatus(this.aave.address,3);  //make the pool synthetic
 
-        await this.pool.addPriceAdjuster(this.bob.address);
+        await this.pool.updatePriceAdjuster(this.bob.address, true);
         expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
 
         await this.pool.connect(this.bob).setPoolPrice(this.aave.address,"100000000000");   
         expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
 
-        await this.pool.removePriceAdjuster(this.bob.address);      //remove role
+        await this.pool.updatePriceAdjuster(this.bob.address, false);      //remove role
         expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(false);
 
     });
