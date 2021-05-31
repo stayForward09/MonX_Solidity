@@ -56,10 +56,19 @@ module.exports = {
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    mumbai: {
+      url: "https://rpc-mumbai.matic.today",
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    matic: {
+      url: "https://rpc-mainnet.matic.network",
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
     }
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.MATIC_API_KEY,
   },
   contractSizer: {
     alphaSort: true,
