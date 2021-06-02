@@ -674,7 +674,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 amountIn, uint256 tradeVusdValue) {
     require(amountOut > 0, 'MonoX:INSUFF_INPUT');
     
-    uint256 amountOutWithFee = amountOut.mul(1e5+fees)/1e5;
+    uint256 amountOutWithFee = amountOut.mul(1e5).div(1e5 - fees);
     address vusdAddress = address(vUSD);
     uint tokenOutPoolPrice = pools[tokenOut].price;
     uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
