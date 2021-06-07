@@ -549,7 +549,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     MonoXLibrary.safeTransferETH(address(monoXPool), amountIn);
     monoXPool.depositWETH(amountIn);
     amountIn = swapOut(WETH, tokenOut, address(this), to, amountOut);
-    require(amountIn < amountSentIn, 'MonoX:BAD_INPUT');
+    require(amountIn <= amountSentIn, 'MonoX:BAD_INPUT');
     require(amountIn <= amountInMax, 'MonoX:EXCESSIVE_INPUT');
     if (amountSentIn > amountIn) {
       MonoXLibrary.safeTransferETH(msg.sender, amountSentIn.sub(amountIn));
@@ -674,7 +674,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 amountIn, uint256 tradeVusdValue) {
     require(amountOut > 0, 'MonoX:INSUFF_INPUT');
     
-    uint256 amountOutWithFee = amountOut.mul(1e5+fees)/1e5;
+    uint256 amountOutWithFee = amountOut.mul(1e5).div(1e5 - fees);
     address vusdAddress = address(vUSD);
     uint tokenOutPoolPrice = pools[tokenOut].price;
     uint tokenOutPoolTokenBalance = pools[tokenOut].tokenBalance;
