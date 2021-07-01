@@ -29,7 +29,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   IvUSD vUSD;
   address WETH;
-  address feeTo;
+  address public feeTo;
   uint16 fees; // over 1e5, 300 means 0.3%
   uint16 devFee; // over 1e5, 50 means 0.05%
 
@@ -254,11 +254,23 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // PoolInfo memory pool = pools[_token];
       uint poolPrice = pools[_token].price;
       require(vusdIn <= pools[_token].vusdDebt,"MonoX:NO_CREDIT");
-      require(pools[_token].tokenBalance * poolPrice >= vusdIn,"MonoX:INSUF_TOKEN_VAL");
+      require((pools[_token].tokenBalance * poolPrice).div(1e18) >= vusdIn,"MonoX:INSUF_TOKEN_VAL");
       // uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
       monoXPool.safeTransferERC20Token(_token, msg.sender, vusdIn.mul(1e18).div(poolPrice));
       _syncPoolInfo(_token, vusdIn, 0);
       emit PoolBalanced(_token, vusdIn);
+  }
+
+  function _internalRebalance(address _token) internal {
+    uint poolPrice = pools[_token].price;
+    uint vusdIn = pools[_token].vusdDebt;
+    if(pools[_token].tokenBalance * poolPrice <= vusdIn){
+      vusdIn = (pools[_token].tokenBalance * poolPrice).div(1e18);
+    }
+
+    monoXPool.safeTransferERC20Token(_token, feeTo, vusdIn.mul(1e18).div(poolPrice));
+    _syncPoolInfo(_token, vusdIn, 0);
+    emit PoolBalanced(_token,vusdIn);
   }
 
   // creates a pool
@@ -816,6 +828,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         to == monoXPoolLocal ? amountOut : 0);
     }
 
+    if(pools[tokenIn].vusdDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
+      _internalRebalance(tokenIn);
+    }
+
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
     
   }
@@ -858,6 +874,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVusdValue.add(oneSideFeesInVusd), 0, 
         to == monoXPoolLocal ? amountOut:0 );
     }
+
+     
+    if(pools[tokenIn].vusdDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
+      _internalRebalance(tokenIn);
+    }
+  
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
 

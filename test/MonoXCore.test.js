@@ -350,7 +350,8 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(600)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(2)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(3)
-        expect(smallNum(await wethAmount.toString())).to.equal(1000000 + 2)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000)   //internal rebalancing happens
+        expect(smallNum(await wethAmount.toString())).to.lessThan(1000001)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -380,7 +381,8 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.equal(1000000 + 1)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000)       //internal rebalancing happens
+        expect(smallNum(await wethAmount.toString())).to.lessThan(1000000.002)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(2)
@@ -411,7 +413,7 @@ describe('MonoX Core', function () {
         
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1.9)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
-        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000 + 1)
+        expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000 - 1)
         expect(smallNum(await wethAmount.toString())).to.lessThan(1000000 + 2)
 
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(1)
@@ -765,5 +767,26 @@ describe('MonoX Core', function () {
             this.pool.listNewToken(this.tToken.address, bigNum(1), 0, bigNum(10000), this.alice.address),
             'MonoX:POOL_EXISTS',
         );
+    });
+
+    it('should rebalance official pool', async function () {
+        const deadline = (await time.latest()) + 10000
+        
+
+        let feeTo=await this.pool.feeTo();
+
+        let feeToBalance = await this.weth.balanceOf(feeTo);
+        expect(feeToBalance).to.equal(0);   //balance of fee to is 0
+
+        await this.pool.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            bigNum(200), bigNum(400), this.bob.address, deadline)
+
+        let infoAfter=await this.pool.pools(this.weth.address);
+        let feeToBalanceAfter = await this.weth.balanceOf(feeTo);
+        
+        expect(infoAfter.vusdDebt).to.equal(0);  // we expect vusdDebt to still be 0 because of internal rebalancing for official pools
+        expect(parseInt(feeToBalanceAfter)).to.greaterThan(0); //we expect the feeTo address to contain the tokens resulted from internal rebalancing
+     
     });
 });
