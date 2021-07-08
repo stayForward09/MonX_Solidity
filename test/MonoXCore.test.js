@@ -785,7 +785,7 @@ describe('MonoX Core', function () {
         let infoAfter=await this.pool.pools(this.weth.address);
         let feeToBalanceAfter = await this.weth.balanceOf(feeTo);
         
-        expect(infoAfter.vusdDebt).to.equal(0);  // we expect vusdDebt to still be 0 because of internal rebalancing for official pools
+        expect(parseInt(infoAfter.vusdDebt)).to.lessThan(10000);  // we expect vusdDebt to still be near0 because of internal rebalancing for official pools
         expect(parseInt(feeToBalanceAfter)).to.greaterThan(0); //we expect the feeTo address to contain the tokens resulted from internal rebalancing
      
     });

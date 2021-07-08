@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 import "./interfaces/IMonoXPool.sol";
 import './interfaces/IWETH.sol';
 import './libraries/MonoXLibrary.sol';
@@ -268,7 +268,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vusdIn = (pools[_token].tokenBalance * poolPrice).div(1e18);
     }
 
-    monoXPool.safeTransferERC20Token(_token, feeTo, vusdIn.mul(1e18).div(poolPrice));
+    uint256 balanceIn0 = IERC20(_token).balanceOf(address(monoXPool));
+    monoXPool.safeTransferERC20Token(_token,feeTo, vusdIn.mul(1e18).div(poolPrice));
+    uint256 balanceIn1 = IERC20(_token).balanceOf(address(monoXPool));
+    uint realAmount = balanceIn0.sub(balanceIn1);
+
+    vusdIn = (realAmount * poolPrice).div(1e18);
     _syncPoolInfo(_token, vusdIn, 0);
     emit PoolBalanced(_token,vusdIn);
   }
