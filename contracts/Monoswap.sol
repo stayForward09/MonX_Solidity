@@ -29,7 +29,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   IvUSD vUSD;
   address WETH;
-  address public feeTo;
+  address feeTo;
   uint16 fees; // over 1e5, 300 means 0.3%
   uint16 devFee; // over 1e5, 50 means 0.05%
 
@@ -44,7 +44,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint112 vusdDebt;
     uint112 vusdCredit;
     uint112 tokenBalance;
-    uint112 price; // over 1e18
+    uint256 price; // over 1e18
   }
 
   enum TxType {
@@ -97,11 +97,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     _;
   }  
 
-  modifier onlySyntheticPool(address _token){
-    require(pools[_token].status==PoolStatus.SYNTHETIC,"MonoX:NOT_SYNT");
-    _;
-  }
-
   modifier onlyPriceAdjuster(){
     require(priceAdjusterRole[msg.sender]==true,"MonoX:BAD_ROLE");
     _;
@@ -111,20 +106,21 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint indexed pid,
     address indexed token,
     uint liquidityAmount,
-    uint vusdAmount, uint tokenAmount);
+    uint vusdAmount, uint tokenAmount, uint price);
 
   event RemoveLiquidity(address indexed provider, 
     uint indexed pid,
     address indexed token,
     uint liquidityAmount,
-    uint vusdAmount, uint tokenAmount);
+    uint vusdAmount, uint tokenAmount, uint price);
 
   event Swap(
     address indexed user,
     address indexed tokenIn,
     address indexed tokenOut,
     uint amountIn,
-    uint amountOut
+    uint amountOut,
+    uint swapVusdValue
   );
 
   // event PriceAdjusterChanged(
@@ -139,7 +135,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   event SyntheticPoolPriceChanged(
     address _token,
-    uint112 price
+    uint price
   );
 
   event PoolStatusChanged(
@@ -231,7 +227,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     @param _token pool identifider (token address)
     @param _newPrice new price in wei (uint112)
    */
-  function updatePoolPrice(address _token, uint112 _newPrice) external onlyOwner {
+  function updatePoolPrice(address _token, uint _newPrice) external onlyOwner {
     require(_newPrice > 0, 'MonoX:0_PRICE');
     require(tokenPoolStatus[_token] != 0, "MonoX:NO_POOL");
 
@@ -245,41 +241,50 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     //emit PriceAdjusterChanged(account,_status);
   }
 
-  function setPoolPrice(address _token, uint112 price) external onlyPriceAdjuster onlySyntheticPool(_token){
+  function setSynthPoolPrice(address _token, uint price) external onlyPriceAdjuster {
+    require(pools[_token].status==PoolStatus.SYNTHETIC,"MonoX:NOT_SYNT");
     pools[_token].price=price;
     emit SyntheticPoolPriceChanged(_token,price);
   }
 
-  function rebalancePool(address _token,uint256 vusdIn) external lockToken(_token) onlyOwner{
-      // PoolInfo memory pool = pools[_token];
-      uint poolPrice = pools[_token].price;
-      require(vusdIn <= pools[_token].vusdDebt,"MonoX:NO_CREDIT");
-      require((pools[_token].tokenBalance * poolPrice).div(1e18) >= vusdIn,"MonoX:INSUF_TOKEN_VAL");
-      // uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
-      monoXPool.safeTransferERC20Token(_token, msg.sender, vusdIn.mul(1e18).div(poolPrice));
-      _syncPoolInfo(_token, vusdIn, 0);
-      emit PoolBalanced(_token, vusdIn);
+  function rebalancePool(address _token) external lockToken(_token) onlyOwner{
+      // // PoolInfo memory pool = pools[_token];
+      // uint poolPrice = pools[_token].price;
+      // require(vusdIn <= pools[_token].vusdDebt,"MonoX:NO_CREDIT");
+      // require((pools[_token].tokenBalance * poolPrice).div(1e18) >= vusdIn,"MonoX:INSUF_TOKEN_VAL");
+      // // uint rebalancedAmount = vusdIn.mul(1e18).div(pool.price);
+      // monoXPool.safeTransferERC20Token(_token, msg.sender, vusdIn.mul(1e18).div(poolPrice));
+      // _syncPoolInfo(_token, vusdIn, 0);
+      // emit PoolBalanced(_token, vusdIn);
+
+      _internalRebalance(_token);
   }
 
+  // must be called from a method with token lock to prevent reentry
   function _internalRebalance(address _token) internal {
     uint poolPrice = pools[_token].price;
     uint vusdIn = pools[_token].vusdDebt;
-    if(pools[_token].tokenBalance * poolPrice <= vusdIn){
-      vusdIn = (pools[_token].tokenBalance * poolPrice).div(1e18);
+    if(pools[_token].tokenBalance * poolPrice / 1e18 < vusdIn){
+      vusdIn = pools[_token].tokenBalance * poolPrice / 1e18;
     }
 
-    uint256 balanceIn0 = IERC20(_token).balanceOf(address(monoXPool));
-    monoXPool.safeTransferERC20Token(_token,feeTo, vusdIn.mul(1e18).div(poolPrice));
-    uint256 balanceIn1 = IERC20(_token).balanceOf(address(monoXPool));
-    uint realAmount = balanceIn0.sub(balanceIn1);
+    if(tokenStatus[_token]==2){
+      monoXPool.safeTransferERC20Token(_token, feeTo, vusdIn.mul(1e18).div(poolPrice));
+    }else{
+      uint256 balanceIn0 = IERC20(_token).balanceOf(address(monoXPool));
+      monoXPool.safeTransferERC20Token(_token, feeTo, vusdIn.mul(1e18).div(poolPrice));
+      uint256 balanceIn1 = IERC20(_token).balanceOf(address(monoXPool));
+      uint realAmount = balanceIn0.sub(balanceIn1);
 
-    vusdIn = (realAmount * poolPrice).div(1e18);
+      vusdIn = (realAmount * poolPrice).div(1e18);
+    }
+    
     _syncPoolInfo(_token, vusdIn, 0);
     emit PoolBalanced(_token,vusdIn);
   }
 
   // creates a pool
-  function _createPool (address _token, uint112 _price, PoolStatus _status) lock internal returns(uint256 _pid)  {
+  function _createPool (address _token, uint _price, PoolStatus _status) lock internal returns(uint256 _pid)  {
     require(tokenPoolStatus[_token]==0, "MonoX:POOL_EXISTS");
     require (_token != address(vUSD), "MonoX:NO_vUSD");
     _pid = poolSize;
@@ -302,7 +307,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // creates a pool with special status
-  function addSpecialToken (address _token, uint112 _price, PoolStatus _status) onlyOwner external returns(uint256 _pid)  {
+  function addSpecialToken (address _token, uint _price, PoolStatus _status) onlyOwner external returns(uint256 _pid)  {
     _pid = _createPool(_token, _price, _status);
   }
 
@@ -326,13 +331,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     // PoolInfo memory pool = pools[_token];
     vusdCredit = pools[_token].vusdCredit;
     vusdDebt = pools[_token].vusdDebt;
-    tokenBalanceVusdValue = uint(pools[_token].price).mul(pools[_token].tokenBalance)/1e18;
+    tokenBalanceVusdValue = pools[_token].price.mul(pools[_token].tokenBalance)/1e18;
 
     poolValue = tokenBalanceVusdValue.add(vusdCredit).sub(vusdDebt);
   }
 
   // trustless listing pool creation. always creates unofficial pool
-  function listNewToken (address _token, uint112 _price, 
+  function listNewToken (address _token, uint _price, 
     uint256 vusdAmount, 
     uint256 tokenAmount,
     address to) external returns(uint _pid, uint256 liquidity) {
@@ -361,7 +366,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     // (uint256 poolValue, , ,) = getPool(_token);
     PoolInfo memory pool = pools[_token];
 
-    uint256 poolValue = uint(pool.price).mul(pool.tokenBalance)/1e18;
+    uint256 poolValue = pool.price.mul(pool.tokenBalance)/1e18;
     poolValue = poolValue.add(pool.vusdCredit).sub(pool.vusdDebt);
 
     IMonoXPool monoXPoolLocal = monoXPool;
@@ -381,6 +386,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 liquidityVusdValue = vusdAmount.add(tokenAmount.mul(pool.price)/1e18);
 
       if(_totalSupply==0){
+        liquidityVusdValue = liquidityVusdValue/1e6; // so $1m would get you 1e18
         liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
         // sorry, oz doesn't allow minting to address(0)
         monoXPoolLocal.mint(feeTo, pool.pid, MINIMUM_LIQUIDITY); 
@@ -396,7 +402,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     pool.pid,
     _token,
     liquidity, 
-    vusdAmount, tokenAmount);
+    vusdAmount, tokenAmount, pool.price);
   }
   
   // add one-sided liquidity to a pool. no vusd
@@ -498,7 +504,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       pool.pid,
       _token,
       liquidityIn, 
-      vusdOut, tokenOut);
+      vusdOut, tokenOut, pool.price);
   }
 
   // actually removes ETH liquidity
@@ -511,7 +517,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // util func to compute new price
   function _getNewPrice (uint256 originalPrice, uint256 reserve, 
-    uint256 delta, TxType txType) pure internal returns(uint256 price) {
+    uint256 delta, uint256 deltaBlocks, TxType txType) pure internal returns(uint256 price) {
     if(txType==TxType.SELL) {
       // no risk of being div by 0
       price = originalPrice.mul(reserve)/(reserve.add(delta));
@@ -655,10 +661,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 _balance = IERC20(_token).balanceOf(address(monoXPool));
     _balance = _balance.sub(_ETHDebt);
     require(pools[_token].status!=PoolStatus.PAUSED,"MonoX:PAUSED");
-    require(_price <= uint112(-1) && _balance <= uint112(-1));
+    require(_balance <= uint112(-1));
     (uint initialPoolValue, , ,) = getPool(_token);
     pools[_token].tokenBalance = uint112(_balance);
-    pools[_token].price = uint112(_price);
+    pools[_token].price = _price;
 
     // record last trade's block number in mapping: lastTradedBlock
     lastTradedBlock[_token] = block.number;
@@ -705,7 +711,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       
       require (tokenOutPoolStatus != PoolStatus.UNLISTED, "MonoX:POOL_UNLST");
       tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
-        amountOutWithFee, TxType.BUY);
+        amountOutWithFee, 0, TxType.BUY);
 
       tradeVusdValue = _getAvgPrice(tokenOutPoolPrice, tokenOutPrice).mul(amountOutWithFee)/1e18;
     }
@@ -731,7 +737,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint directSwapTokenInPrice = allowDirectSwap?tokenOutPoolPrice.mul(tokenInPoolPrice).div(tokenOutPrice):1;
 
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
-        amountIn, TxType.SELL);
+        amountIn, 0, TxType.SELL);
 
       tokenInPrice = directSwapTokenInPrice > tokenInPrice?directSwapTokenInPrice:tokenInPrice;
 
@@ -761,7 +767,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       require (tokenInPoolStatus != PoolStatus.UNLISTED, "MonoX:POOL_UNLST");
       
       tokenInPrice = _getNewPrice(tokenInPoolPrice, tokenInPoolTokenBalance, 
-        amountInWithFee, TxType.SELL);
+        amountInWithFee, 0, TxType.SELL);
       tradeVusdValue = _getAvgPrice(tokenInPoolPrice, tokenInPrice).mul(amountInWithFee)/1e18;
     }
 
@@ -787,7 +793,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
       // prevent the attack where user can use a small pool to update price in a much larger pool
       tokenOutPrice = _getNewPrice(tokenOutPoolPrice, tokenOutPoolTokenBalance, 
-        amountOut, TxType.BUY);
+        amountOut, 0, TxType.BUY);
       tokenOutPrice = directSwapTokenOutPrice < tokenOutPrice?directSwapTokenOutPrice:tokenOutPrice;
 
       amountOut = tradeVusdValue.mul(1e18).div(_getAvgPrice(tokenOutPoolPrice, tokenOutPrice));
@@ -837,7 +843,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _internalRebalance(tokenIn);
     }
 
-    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
+    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVusdValue);
     
   }
 
@@ -886,7 +892,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     }
   
 
-    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut);
+    emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVusdValue);
 
   }
 
@@ -894,12 +900,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   //   return monoXPool.balanceOf(account, id);
   // }
 
-  // function getConfig() public view returns (address _vUSD, address _feeTo, uint16 _fees, uint16 _devFee) {
-  //   _vUSD = address(vUSD);
-  //   _feeTo = feeTo;
-  //   _fees = fees;
-  //   _devFee = devFee;
-  // }
+  function getConfig() public view returns (address _vUSD, address _weth, address _feeTo, uint16 _fees, uint16 _devFee) {
+    _vUSD = address(vUSD);
+    _weth = WETH;
+    _feeTo = feeTo;
+    _fees = fees;
+    _devFee = devFee;
+  }
 
   function transferAndCheck(address from,address to,address _token,uint amount) internal returns (uint256){
     if(from == address(this)){

@@ -642,7 +642,7 @@ describe('MonoX Core', function () {
 
         const poolBalanceBeforeRebalancing = ((await this.pool.pools(this.aave.address)).tokenBalance).toString();
 
-        await this.pool.rebalancePool(this.aave.address,'100207967701922338036149');
+        await this.pool.rebalancePool(this.aave.address);
 
         const poolInfoAfterBalance = await this.pool.getPool(this.aave.address);  
         
@@ -660,7 +660,7 @@ describe('MonoX Core', function () {
 
         console.log('tokens received by owner',aliceBalanceAfterRebalancing-aliceBalanceBeforeRebalancing);
 
-        expect(poolInfoAfterBalance.vusdDebt.toString()).to.equal('0'); //we expect the new debt to be 0
+        expect(poolInfoAfterBalance.vusdDebt.toNumber()).to.lessThan(1000); //we expect the new debt to be close to 0
 
         expect(poolPriceAfterRebalancing).to.equal(poolPriceBeforeRebalancing);
 
@@ -675,7 +675,7 @@ describe('MonoX Core', function () {
         await this.pool.updatePriceAdjuster(this.bob.address, true);
         expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
 
-        await this.pool.connect(this.bob).setPoolPrice(this.aave.address,"100000000000");   
+        await this.pool.connect(this.bob).setSynthPoolPrice(this.aave.address,"100000000000");   
         expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
 
         await this.pool.updatePriceAdjuster(this.bob.address, false);      //remove role
@@ -773,7 +773,7 @@ describe('MonoX Core', function () {
         const deadline = (await time.latest()) + 10000
         
 
-        let feeTo=await this.pool.feeTo();
+        let feeTo=(await this.pool.getConfig())[2];
 
         let feeToBalance = await this.weth.balanceOf(feeTo);
         expect(feeToBalance).to.equal(0);   //balance of fee to is 0
