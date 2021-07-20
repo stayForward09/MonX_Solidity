@@ -58,7 +58,7 @@ module.exports = {
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     mumbai: {
-      url: "https://rpc-mumbai.matic.today",
+      url: "https://naughty-blackwell:waffle-sprawl-math-used-ripple-snarl@nd-311-035-380.p2pify.com",
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     matic: {
@@ -67,8 +67,8 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
-    // apiKey: process.env.MATIC_API_KEY,
+    // apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: process.env.MATIC_API_KEY,
   },
   contractSizer: {
     alphaSort: true,

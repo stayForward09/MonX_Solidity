@@ -419,14 +419,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // updates pool vusd balance, token balance and last pool value.
   // this function requires others to do the input validation
-  function _syncPoolInfo (address _token, uint256 vusdIn, uint256 vusdOut) internal returns(uint256 poolValue, 
-    uint256 tokenBalanceVusdValue, uint256 vusdCredit, uint256 vusdDebt) {
+  function _syncPoolInfo (address _token, uint256 vusdIn, uint256 vusdOut) internal {
     // PoolInfo memory pool = pools[_token];
     uint256 tokenPoolPrice = pools[_token].price;
-    (vusdCredit, vusdDebt) = _updateVusdBalance(_token, vusdIn, vusdOut);
+    (uint256 vusdCredit, uint256 vusdDebt) = _updateVusdBalance(_token, vusdIn, vusdOut);
 
     uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
-    tokenBalanceVusdValue = tokenPoolPrice.mul(tokenReserve)/1e18;
+    uint256 tokenBalanceVusdValue = tokenPoolPrice.mul(tokenReserve)/1e18;
 
     require(tokenReserve <= uint112(-1));
     pools[_token].tokenBalance = uint112(tokenReserve);
