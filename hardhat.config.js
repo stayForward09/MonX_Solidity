@@ -19,6 +19,32 @@ task("accounts", "Prints the list of accounts", async () => {
   }
 });
 
+task("set-official-pool", "Sets a pool to official")
+  .addParam("monoswap", "MONO core's address")
+  .addParam("pool", "pool token address")
+  .setAction(async (args) => {
+
+  const [deployer] = await ethers.getSigners();
+
+  if(!(ethers.utils.isAddress(args.monoswap) && ethers.utils.isAddress(args.pool))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  );
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  
+  const Monoswap = await ethers.getContractFactory("Monoswap");
+  const monoswap = await Monoswap.attach(args.monoswap);
+  await monoswap.updatePoolStatus(args.pool, 2);
+
+  console.log("success");
+})
+
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
@@ -67,8 +93,8 @@ module.exports = {
     }
   },
   etherscan: {
-    // apiKey: process.env.ETHERSCAN_API_KEY,
-    apiKey: process.env.MATIC_API_KEY,
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    // apiKey: process.env.MATIC_API_KEY,
   },
   contractSizer: {
     alphaSort: true,
