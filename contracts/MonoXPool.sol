@@ -13,7 +13,14 @@ import './interfaces/IWETH.sol';
 contract MonoXPool is ERC1155("{1}"), Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
-    mapping (uint256 => uint256) public totalSupply;
+    
+    struct LiquidityInfo {
+      uint256 totalSupply;
+      mapping(address => uint256) lastAddedBlock;
+      address topHolder;
+    }
+    mapping (uint256 => LiquidityInfo) liquidityInfo;
+
     address public WETH;
 
     constructor (address _WETH) {
@@ -24,17 +31,25 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     }
 
     function mint (address account, uint256 id, uint256 amount) public onlyOwner {
-      totalSupply[id]=totalSupply[id].add(amount);
+      LiquidityInfo storage liquidity = liquidityInfo[id];
+      liquidity.totalSupply = liquidity.totalSupply.add(amount);
+      liquidity.lastAddedBlock[account] = block.number;
       _mint(account, id, amount, "");
+      uint256 liquidityAmount = balanceOf(account, id);
+      uint256 topHolderAmount = liquidity.topHolder != address(0) ? balanceOf(liquidity.topHolder, id) : 0;
+      if (liquidityAmount > topHolderAmount) {
+        liquidity.topHolder = account;
+      }
     }
 
     function burn (address account, uint256 id, uint256 amount) public onlyOwner {
-      totalSupply[id]=totalSupply[id].sub(amount);
+      LiquidityInfo storage liquidity = liquidityInfo[id];
+      liquidity.totalSupply = liquidity.totalSupply.sub(amount);
       _burn(account, id, amount);
     }
 
     function totalSupplyOf(uint256 pid) external view returns (uint256) {
-      return totalSupply[pid];
+      return liquidityInfo[pid].totalSupply;
     }
 
     function depositWETH(uint256 amount) external {
@@ -55,5 +70,13 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
 
     function getWETHAddr() external view returns (address) {
       return address(WETH);
+    }
+
+    function liquidityLastAddedBlock(uint256 pid, address account) external view returns (uint256) {
+      return liquidityInfo[pid].lastAddedBlock[account];
+    }
+
+    function topLPHolder(uint256 pid) external view returns (address) {
+      return liquidityInfo[pid].topHolder;
     }
 }

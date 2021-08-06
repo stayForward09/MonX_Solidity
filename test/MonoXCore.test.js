@@ -23,7 +23,7 @@ const overrides = {
     gasLimit: 9500000
 }
 const DEFAULT_ETH_AMOUNT = 10000000000
-
+const SECONDS_PER_BLOCK = 60 * 60 / 2 * 1000; // 30 mins per block
 describe('MonoX Core', function () {
     before(async function () {
         this.signers = await ethers.getSigners()
@@ -46,6 +46,7 @@ describe('MonoX Core', function () {
         this.dai = await this.MockERC20.deploy('Dai', 'DAI', e26);
         this.uni = await this.MockERC20.deploy('UNI', 'UNI', e26);
         this.aave = await this.MockERC20.deploy('Aave','AAVE',e26); // used to test if exploit is possible at low value of the pool
+        this.comp = await this.MockERC20.deploy('Compound','COMP',e26); 
         this.vusd = await this.vUSD.deploy();
 
         await this.weth.deposit({value: bigNum(100000000)})
@@ -60,12 +61,14 @@ describe('MonoX Core', function () {
         await this.dai.transfer( this.bob.address, bigNum(10000000))
         await this.uni.transfer( this.bob.address, bigNum(10000000))
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
+        await this.comp.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
         this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address],{unsafeAllowLinkedLibraries:true})
         this.vusd.transferOwnership(this.pool.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
+        this.pool.setSecondsPerBlock(SECONDS_PER_BLOCK)
 
         const timestamp = (await time.latest()) + 10000;
 
@@ -76,6 +79,7 @@ describe('MonoX Core', function () {
         await this.aave.connect(this.alice).approve(this.pool.address, e26);    //alice approval
         await this.aave.approve(this.pool.address, e26);    //owner approval
         await this.vusd.connect(this.alice).approve(this.pool.address, e26);
+        await this.comp.connect(this.alice).approve(this.pool.address, e26);
 
         await this.weth.connect(this.bob).approve(this.pool.address, e26);
         await this.yfi.connect(this.bob).approve(this.pool.address, e26);
@@ -83,11 +87,13 @@ describe('MonoX Core', function () {
         await this.uni.connect(this.bob).approve(this.pool.address, e26);
         await this.vusd.connect(this.bob).approve(this.pool.address, e26);
         await this.aave.connect(this.bob).approve(this.pool.address, e26);    //bob approval
+        await this.comp.connect(this.bob).approve(this.pool.address, e26);
 
         await this.pool.addSpecialToken(this.weth.address, bigNum(300), 2)
         await this.pool.addSpecialToken(this.dai.address, bigNum(1), 2)
         await this.pool.addSpecialToken(this.aave.address, bigNum(100), 3)    // aave price starts at 100
         await this.pool.addSpecialToken(this.uni.address, bigNum(30), 2)
+        await this.pool.addSpecialToken(this.comp.address, bigNum(30), 1)
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -103,6 +109,9 @@ describe('MonoX Core', function () {
             bigNum(1000), this.alice.address);       // 1000 aave is added by alice
 
         await this.pool.connect(this.alice).addLiquidity(this.uni.address, 
+            bigNum(1000000), this.alice.address);
+
+        await this.pool.connect(this.alice).addLiquidity(this.comp.address, 
             bigNum(1000000), this.alice.address);
         
     })
@@ -230,7 +239,11 @@ describe('MonoX Core', function () {
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 0)).toString()
 
         console.log('liquidity', liquidity);
-
+        await expect(this.pool.connect(this.alice).removeLiquidity(
+            this.weth.address, liquidity, this.alice.address, 0, 0))
+            .to.be.revertedWith("MonoX:WRONG_TIME")
+        for (let i = 0; i < 2 * 4; i ++)
+            await time.advanceBlock()
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0);
 
@@ -256,7 +269,8 @@ describe('MonoX Core', function () {
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
-
+        for (let i = 0; i < 2 * 4; i ++)
+        await time.advanceBlock()
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.uni.address, liquidity, this.alice.address, 0, 0);
 
@@ -278,6 +292,8 @@ describe('MonoX Core', function () {
             { ...overrides, value: bigNum(1000000) }
             );
         const liquidity = (await this.monoXPool.balanceOf(this.bob.address, 0)).toString()
+        for (let i = 0; i < 2 * 4; i ++)
+        await time.advanceBlock()
         const results = await this.pool.connect(this.bob).removeLiquidityETH(
             liquidity, this.bob.address, 0, 0);
 
@@ -609,7 +625,8 @@ describe('MonoX Core', function () {
             )
 
         console.log('liquidity before/after',bobAaveLPBefore,bobAaveLPAfter);   //we can see bob now has a huge number of lp
-
+        for (let i = 0; i < 2 * 4; i ++)
+            await time.advanceBlock()
         await this.pool.connect(this.bob).removeLiquidity(
             this.aave.address, bobAaveLPAfter, this.bob.address, 0, 0);
 
@@ -788,5 +805,25 @@ describe('MonoX Core', function () {
         expect(parseInt(infoAfter.vusdDebt)).to.lessThan(10000);  // we expect vusdDebt to still be near0 because of internal rebalancing for official pools
         expect(parseInt(feeToBalanceAfter)).to.greaterThan(0); //we expect the feeTo address to contain the tokens resulted from internal rebalancing
      
+    });
+
+    it('should not remove liquidity for largest LP holder', async function () {
+
+        const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
+
+        console.log('liquidity', liquidity);
+        
+        await expect(this.pool.connect(this.alice).removeLiquidity(
+            this.comp.address, liquidity, this.alice.address, 0, 0))
+            .to.be.revertedWith("MonoX:WRONG_TIME")
+        for (let i = 0; i < 2 * 24; i ++)
+            await time.advanceBlock()
+        await expect(this.pool.connect(this.alice).removeLiquidity(
+            this.comp.address, liquidity, this.alice.address, 0, 0))
+            .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME")
+        for (let i = 0; i < 2* 24 * 90; i ++)
+            await time.advanceBlock()
+        const results = await this.pool.connect(this.alice).removeLiquidity(
+                this.comp.address, liquidity, this.alice.address, 0, 0);
     });
 });
