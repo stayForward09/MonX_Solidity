@@ -23,7 +23,6 @@ const overrides = {
     gasLimit: 9500000
 }
 const DEFAULT_ETH_AMOUNT = 10000000000
-const SECONDS_PER_BLOCK = 60 * 60 / 2 * 1000; // 30 mins per block
 describe('MonoX Core', function () {
     before(async function () {
         this.signers = await ethers.getSigners()
@@ -68,7 +67,6 @@ describe('MonoX Core', function () {
         this.vusd.transferOwnership(this.pool.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
-        this.pool.setSecondsPerBlock(SECONDS_PER_BLOCK)
 
         const timestamp = (await time.latest()) + 10000;
 
@@ -242,8 +240,7 @@ describe('MonoX Core', function () {
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:WRONG_TIME")
-        for (let i = 0; i < 2 * 4; i ++)
-            await time.advanceBlock()
+        await time.increase(60 * 60 * 4)
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0);
 
@@ -269,8 +266,7 @@ describe('MonoX Core', function () {
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
-        for (let i = 0; i < 2 * 4; i ++)
-        await time.advanceBlock()
+        await time.increase(60 * 60 * 24)
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.uni.address, liquidity, this.alice.address, 0, 0);
 
@@ -292,8 +288,7 @@ describe('MonoX Core', function () {
             { ...overrides, value: bigNum(1000000) }
             );
         const liquidity = (await this.monoXPool.balanceOf(this.bob.address, 0)).toString()
-        for (let i = 0; i < 2 * 4; i ++)
-        await time.advanceBlock()
+        await time.increase(60 * 60 * 24)
         const results = await this.pool.connect(this.bob).removeLiquidityETH(
             liquidity, this.bob.address, 0, 0);
 
@@ -625,8 +620,7 @@ describe('MonoX Core', function () {
             )
 
         console.log('liquidity before/after',bobAaveLPBefore,bobAaveLPAfter);   //we can see bob now has a huge number of lp
-        for (let i = 0; i < 2 * 4; i ++)
-            await time.advanceBlock()
+        await time.increase(60 * 60 * 24)
         await this.pool.connect(this.bob).removeLiquidity(
             this.aave.address, bobAaveLPAfter, this.bob.address, 0, 0);
 
@@ -816,14 +810,19 @@ describe('MonoX Core', function () {
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:WRONG_TIME")
-        for (let i = 0; i < 2 * 24; i ++)
-            await time.advanceBlock()
+        await time.increase(60 * 60 * 24)
+        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+            bigNum(500000), this.bob.address);
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME")
-        for (let i = 0; i < 2* 24 * 90; i ++)
-            await time.advanceBlock()
-        const results = await this.pool.connect(this.alice).removeLiquidity(
+        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+            bigNum(1000000), this.bob.address);
+        await this.pool.connect(this.alice).removeLiquidity(
                 this.comp.address, liquidity, this.alice.address, 0, 0);
+        await time.increase(60 * 60 * 24 * 90)
+        const bobLiquidity = (await this.monoXPool.balanceOf(this.bob.address, 4)).toString()
+        await this.pool.connect(this.alice).removeLiquidity(
+            this.comp.address, bobLiquidity, this.bob.address, 0, 0);
     });
 });

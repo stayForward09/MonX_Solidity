@@ -19,8 +19,8 @@ interface IMonoXPool is IERC1155 {
 
     function getWETHAddr() external view returns (address);
 
-    function liquidityLastAddedBlock(uint256 pid, address account) external view returns(uint256);
+    function liquidityLastAddedOf(uint256 pid, address account) external view returns(uint256);
 
-    function topLPHolder(uint256 pid) external view returns (address);
+    function topLPHolderOf(uint256 pid) external view returns (address);
 
 }
