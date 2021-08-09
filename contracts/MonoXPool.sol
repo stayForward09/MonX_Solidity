@@ -36,11 +36,26 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       if (liquidityAmount > topHolderAmount) {
         topHolder[id] = account;
       }
-    }
+    }                                
 
     function burn (address account, uint256 id, uint256 amount) public onlyOwner {
       totalSupply[id]=totalSupply[id].sub(amount);
       _burn(account, id, amount);
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    )
+        public
+        virtual
+        override
+    {
+      require(msg.sender != topHolder[id], "MonoXPool:TOP HOLDER");
+      super.safeTransferFrom(from, to, id, amount, data);
     }
 
     function totalSupplyOf(uint256 pid) external view returns (uint256) {
