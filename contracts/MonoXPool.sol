@@ -63,10 +63,10 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         override
     {
       require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
-      require(isUnofficial[id] && liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
-      require(!isUnofficial[id] && liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+      require((isUnofficial[id] && liquidityLastAdded[id][from] + 24 hours <= block.timestamp)
+        || (!isUnofficial[id] && liquidityLastAdded[id][from] + 4 hours <= block.timestamp), "MonoXPool:WRONG_TIME");
       liquidityLastAdded[id][to] = block.timestamp;
-      
+
       super.safeTransferFrom(from, to, id, amount, data);
       
       _setTopHolder(id, to);
