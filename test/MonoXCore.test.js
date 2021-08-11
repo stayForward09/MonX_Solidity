@@ -816,15 +816,10 @@ describe('MonoX Core', function () {
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address)
         await time.increase(60 * 60 * 24)
-        await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
-        liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
-        
-        await time.increase(60 * 60 * 24)
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME") // burn restriction for largest LP holder
-        await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii(''))) 
-            .to.be.revertedWith("MonoXPool:TOP HOLDER") // transfer restriction for largest LP holder
+        
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(2000000), this.bob.address);
         await this.pool.connect(this.alice).removeLiquidity(
@@ -833,5 +828,22 @@ describe('MonoX Core', function () {
         const bobLiquidity = (await this.monoXPool.balanceOf(this.bob.address, 4)).toString()
         await this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, bobLiquidity, this.bob.address, 0, 0);
+    });
+
+    it('should transfer lp tokens', async function () {
+
+        let liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
+
+        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+            bigNum(500000), this.bob.address)
+        await expect(this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')))
+            .to.be.revertedWith("MonoXPool:WRONG_TIME")
+        await time.increase(60 * 60 * 24)
+        await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
+        liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
+        
+        await time.increase(60 * 60 * 24)
+        await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii(''))) 
+            .to.be.revertedWith("MonoXPool:TOP HOLDER") // transfer restriction for largest LP holder
     });
 });

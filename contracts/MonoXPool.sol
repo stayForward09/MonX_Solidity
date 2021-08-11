@@ -37,7 +37,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
 
       mint(account, id, amount);
       
-      _setTopHolder(id, account);
+      _trackTopHolder(id, account);
     }     
 
     function mint (address account, uint256 id, uint256 amount) public onlyOwner {
@@ -63,13 +63,15 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         override
     {
       require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
-      require((isUnofficial[id] && liquidityLastAdded[id][from] + 24 hours <= block.timestamp)
-        || (!isUnofficial[id] && liquidityLastAdded[id][from] + 4 hours <= block.timestamp), "MonoXPool:WRONG_TIME");
+      if (isUnofficial[id])
+        require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+      else 
+        require(liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
       liquidityLastAdded[id][to] = block.timestamp;
 
       super.safeTransferFrom(from, to, id, amount, data);
       
-      _setTopHolder(id, to);
+      _trackTopHolder(id, to);
     }
 
     function totalSupplyOf(uint256 pid) external view returns (uint256) {
@@ -104,7 +106,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       return topHolder[pid];
     }
 
-    function _setTopHolder(uint256 id, address account) internal {
+    function _trackTopHolder(uint256 id, address account) internal {
       if (isUnofficial[id] || createdAt[id] + 90 days > block.timestamp) {
         uint256 liquidityAmount = balanceOf(account, id);
         uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
