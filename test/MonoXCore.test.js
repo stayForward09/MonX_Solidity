@@ -830,7 +830,7 @@ describe('MonoX Core', function () {
             this.comp.address, bobLiquidity, this.bob.address, 0, 0);
     });
 
-    it('should transfer lp tokens', async function () {
+    it('should transfer lp tokens in unofficial pool', async function () {
 
         let liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 
@@ -841,9 +841,18 @@ describe('MonoX Core', function () {
         await time.increase(60 * 60 * 24)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
         liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
-        
+
         await time.increase(60 * 60 * 24)
         await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii(''))) 
             .to.be.revertedWith("MonoXPool:TOP HOLDER") // transfer restriction for largest LP holder
+    });
+
+    it('should transfer lp tokens in official pools', async function () {
+
+        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+            bigNum(500000), this.bob.address)
+        
+        await time.increase(60 * 60 * 4)
+        await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 3, bigNum(1), web3.utils.fromAscii('')) 
     });
 });
