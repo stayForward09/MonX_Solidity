@@ -321,7 +321,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = monoXPool.totalSupplyOf(pid).mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      monoXPool.mint(feeTo, pid, devLiquidity, 0, false); // don't need to track top holder if it's feeTo
+      monoXPool.mint(feeTo, pid, devLiquidity);
     }
     
   }
@@ -390,13 +390,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         liquidityVusdValue = liquidityVusdValue/1e6; // so $1m would get you 1e18
         liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
         // sorry, oz doesn't allow minting to address(0)
-        monoXPoolLocal.mint(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.createdAt, pool.status == PoolStatus.OFFICIAL); 
+        monoXPoolLocal.mintLp(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.status == PoolStatus.OFFICIAL); 
       }else{
         liquidity = _totalSupply.mul(liquidityVusdValue).div(poolValue);
       }
     }
     
-    monoXPoolLocal.mint(to, pool.pid, liquidity, pool.createdAt, pool.status == PoolStatus.OFFICIAL);
+    monoXPoolLocal.mintLp(to, pool.pid, liquidity, pool.status == PoolStatus.OFFICIAL);
     _syncPoolInfo(_token, vusdAmount, 0);
 
     emit AddLiquidity(to, 

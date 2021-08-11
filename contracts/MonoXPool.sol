@@ -17,6 +17,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     address public WETH;
     mapping (uint256 => uint256) public totalSupply;
     mapping (uint256 => uint256) public createdAt;
+    mapping (uint256 => bool) public isOfficial;
     mapping (uint256 => address) public topHolder;
     mapping(uint256 => mapping(address => uint256)) liquidityLastAdded;
 
@@ -27,23 +28,30 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     receive() external payable {
     }
 
-    function mint (address account, uint256 id, uint256 amount, uint256 _createdAt, bool _isOfficial) public onlyOwner {
+    function mintLp(address account, uint256 id, uint256 amount, bool _isOfficial) public onlyOwner {
       if (createdAt[id] == 0) 
-        createdAt[id] = _createdAt;
+        createdAt[id] = block.timestamp;
 
-      totalSupply[id] = totalSupply[id].add(amount);
-      
+      isOfficial[id] = _isOfficial;
       liquidityLastAdded[id][account] = block.timestamp;
-      _mint(account, id, amount, "");
-      if (!_isOfficial || _createdAt + 90 days > block.timestamp) {
+
+      mint(account, id, amount);
+      
+      if (!_isOfficial || createdAt[id] + 90 days > block.timestamp) {
         uint256 liquidityAmount = balanceOf(account, id);
         uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
         if (liquidityAmount > topHolderAmount) {
           topHolder[id] = account;
         }
       }
+    }     
+
+    function mint (address account, uint256 id, uint256 amount) public onlyOwner {
+      totalSupply[id] = totalSupply[id].add(amount);
+      _mint(account, id, amount, "");
     }                                
 
+    // It doesn't track largest LP holder here because largest LP holder can not transfer tokens within 3 months.
     function burn (address account, uint256 id, uint256 amount) public onlyOwner {
       totalSupply[id] = totalSupply[id].sub(amount);
       _burn(account, id, amount);
@@ -60,7 +68,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(!(from == topHolder[id] && createdAt[id] + 90 days > block.timestamp), "MonoXPool:TOP HOLDER");
+      require(!(isOfficial[id] == false && from == topHolder[id] && createdAt[id] + 90 days > block.timestamp), "MonoXPool:TOP HOLDER");
       super.safeTransferFrom(from, to, id, amount, data);
     }
 
