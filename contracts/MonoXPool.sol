@@ -17,7 +17,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     address public WETH;
     mapping (uint256 => uint256) public totalSupply;
     mapping (uint256 => uint256) public createdAt;
-    mapping (uint256 => bool) public isOfficial;
+    mapping (uint256 => bool) public isUnofficial;
     mapping (uint256 => address) public topHolder;
     mapping(uint256 => mapping(address => uint256)) liquidityLastAdded;
 
@@ -28,22 +28,16 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     receive() external payable {
     }
 
-    function mintLp(address account, uint256 id, uint256 amount, bool _isOfficial) public onlyOwner {
+    function mintLp(address account, uint256 id, uint256 amount, bool _isUnofficial) public onlyOwner {
       if (createdAt[id] == 0) 
         createdAt[id] = block.timestamp;
 
-      isOfficial[id] = _isOfficial;
+      isUnofficial[id] = _isUnofficial;
       liquidityLastAdded[id][account] = block.timestamp;
 
       mint(account, id, amount);
       
-      if (!_isOfficial || createdAt[id] + 90 days > block.timestamp) {
-        uint256 liquidityAmount = balanceOf(account, id);
-        uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
-        if (liquidityAmount > topHolderAmount) {
-          topHolder[id] = account;
-        }
-      }
+      _setTopHolder(id, account);
     }     
 
     function mint (address account, uint256 id, uint256 amount) public onlyOwner {
@@ -51,7 +45,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       _mint(account, id, amount, "");
     }                                
 
-    // It doesn't track largest LP holder here because largest LP holder can not transfer tokens within 3 months.
+    // largest LP can't burn so no need to keep tracking here
     function burn (address account, uint256 id, uint256 amount) public onlyOwner {
       totalSupply[id] = totalSupply[id].sub(amount);
       _burn(account, id, amount);
@@ -68,8 +62,14 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(isOfficial[id] == true || from != topHolder[id] || createdAt[id] + 90 days < block.timestamp, "MonoXPool:TOP HOLDER");
+      require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
+      require(isUnofficial[id] && liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+      require(!isUnofficial[id] && liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+      liquidityLastAdded[id][to] = block.timestamp;
+      
       super.safeTransferFrom(from, to, id, amount, data);
+      
+      _setTopHolder(id, to);
     }
 
     function totalSupplyOf(uint256 pid) external view returns (uint256) {
@@ -102,5 +102,15 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
 
     function topLPHolderOf(uint256 pid) external view returns (address) {
       return topHolder[pid];
+    }
+
+    function _setTopHolder(uint256 id, address account) internal {
+      if (isUnofficial[id] || createdAt[id] + 90 days > block.timestamp) {
+        uint256 liquidityAmount = balanceOf(account, id);
+        uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
+        if (liquidityAmount > topHolderAmount) {
+          topHolder[id] = account;
+        }
+      }
     }
 }

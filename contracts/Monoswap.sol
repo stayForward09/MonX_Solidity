@@ -390,13 +390,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         liquidityVusdValue = liquidityVusdValue/1e6; // so $1m would get you 1e18
         liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
         // sorry, oz doesn't allow minting to address(0)
-        monoXPoolLocal.mintLp(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.status == PoolStatus.OFFICIAL); 
+        monoXPoolLocal.mintLp(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.status == PoolStatus.LISTED); 
       }else{
         liquidity = _totalSupply.mul(liquidityVusdValue).div(poolValue);
       }
     }
     
-    monoXPoolLocal.mintLp(to, pool.pid, liquidity, pool.status == PoolStatus.OFFICIAL);
+    monoXPoolLocal.mintLp(to, pool.pid, liquidity, pool.status == PoolStatus.LISTED);
     _syncPoolInfo(_token, vusdAmount, 0);
 
     emit AddLiquidity(to, 
