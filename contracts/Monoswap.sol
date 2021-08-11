@@ -447,9 +447,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     IMonoXPool monoXPoolLocal = monoXPool;
     uint256 lastAdded = monoXPoolLocal.liquidityLastAddedOf(pool.pid, msg.sender);
     
-    require((lastAdded + (pool.status == PoolStatus.OFFICIAL ? 4 hours : pool.status == PoolStatus.LISTED ? 24 hours : 0)) <= block.timestamp, "MonoX:WRONG_TIME");
+    require((lastAdded + (pool.status == PoolStatus.OFFICIAL ? 4 hours : pool.status == PoolStatus.LISTED ? 24 hours : 0)) <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
     address topLPHolder = monoXPoolLocal.topLPHolderOf(pool.pid);
-    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME");
+    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
 
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
