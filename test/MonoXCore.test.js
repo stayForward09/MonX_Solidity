@@ -91,7 +91,7 @@ describe('MonoX Core', function () {
         await this.pool.addSpecialToken(this.dai.address, bigNum(1), 2)
         await this.pool.addSpecialToken(this.aave.address, bigNum(100), 3)    // aave price starts at 100
         await this.pool.addSpecialToken(this.uni.address, bigNum(30), 2)
-        await this.pool.addSpecialToken(this.comp.address, bigNum(30), 1)
+        await this.pool.addSpecialToken(this.comp.address, bigNum(30), 1) // unofficial pool
 
         await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
@@ -239,7 +239,7 @@ describe('MonoX Core', function () {
         console.log('liquidity', liquidity);
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0))
-            .to.be.revertedWith("MonoX:WRONG_TIME")
+            .to.be.revertedWith("MonoX:WRONG_TIME") // remove liquidity after add liquidity
         await time.increase(60 * 60 * 4)
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0);
@@ -266,6 +266,9 @@ describe('MonoX Core', function () {
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
+        await expect(this.pool.connect(this.alice).removeLiquidity(
+            this.comp.address, liquidity, this.alice.address, 0, 0))
+            .to.be.revertedWith("MonoX:WRONG_TIME")
         await time.increase(60 * 60 * 24)
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.uni.address, liquidity, this.alice.address, 0, 0);
@@ -801,7 +804,7 @@ describe('MonoX Core', function () {
      
     });
 
-    it('should not remove liquidity for largest LP holder', async function () {
+    it('should not remove liquidity for largest LP holder in unofficial pool', async function () {
 
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 
@@ -809,15 +812,15 @@ describe('MonoX Core', function () {
         
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
-            .to.be.revertedWith("MonoX:WRONG_TIME")
+            .to.be.revertedWith("MonoX:WRONG_TIME") // remove liquidity after add liquidity
         await time.increase(60 * 60 * 24)
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address);
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
-            .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME")
-        await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii('')))
-            .to.be.revertedWith("MonoXPool:TOP HOLDER")
+            .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME") // burn restriction for largest LP holder
+        await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii(''))) 
+            .to.be.revertedWith("MonoXPool:TOP HOLDER") // transfer restriction for largest LP holder
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(1000000), this.bob.address);
         await this.pool.connect(this.alice).removeLiquidity(
