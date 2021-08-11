@@ -816,6 +816,8 @@ describe('MonoX Core', function () {
         await expect(this.pool.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME")
+        await expect(this.monoXPool.connect(this.alice).safeTransferFrom(this.alice.address, this.bob.address, 4, liquidity, web3.utils.fromAscii('')))
+            .to.be.revertedWith("MonoXPool:TOP HOLDER")
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(1000000), this.bob.address);
         await this.pool.connect(this.alice).removeLiquidity(

@@ -44,7 +44,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint112 vusdCredit;
     uint112 tokenBalance;
     uint256 price; // over 1e18
-    uint256 startTime;
+    uint256 createdAt; // timestamp
   }
 
   enum TxType {
@@ -297,7 +297,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       lastPoolValue: 0,
       status: _status,
       price: _price,
-      startTime: block.timestamp
+      createdAt: block.timestamp
     });
 
     poolSize = _pid.add(1);
@@ -321,7 +321,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
       uint256 devLiquidity = monoXPool.totalSupplyOf(pid).mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      monoXPool.mint(feeTo, pid, devLiquidity);
+      monoXPool.mint(feeTo, pid, devLiquidity, 0, false); // don't need to track top holder if it's feeTo
     }
     
   }
@@ -390,13 +390,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         liquidityVusdValue = liquidityVusdValue/1e6; // so $1m would get you 1e18
         liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
         // sorry, oz doesn't allow minting to address(0)
-        monoXPoolLocal.mint(feeTo, pool.pid, MINIMUM_LIQUIDITY); 
+        monoXPoolLocal.mint(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.createdAt, pool.status == PoolStatus.OFFICIAL); 
       }else{
         liquidity = _totalSupply.mul(liquidityVusdValue).div(poolValue);
       }
     }
-
-    monoXPoolLocal.mint(to, pool.pid, liquidity);
+    
+    monoXPoolLocal.mint(to, pool.pid, liquidity, pool.createdAt, pool.status == PoolStatus.OFFICIAL);
     _syncPoolInfo(_token, vusdAmount, 0);
 
     emit AddLiquidity(to, 
@@ -449,7 +449,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     
     require((lastAdded + (pool.status == PoolStatus.OFFICIAL ? 4 hours : pool.status == PoolStatus.LISTED ? 24 hours : 0)) <= block.timestamp, "MonoX:WRONG_TIME");
     address topLPHolder = monoXPoolLocal.topLPHolderOf(pool.pid);
-    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.startTime + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME");
+    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME");
 
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);

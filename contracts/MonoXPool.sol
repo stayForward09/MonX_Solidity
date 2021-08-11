@@ -16,6 +16,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
 
     address public WETH;
     mapping (uint256 => uint256) public totalSupply;
+    mapping (uint256 => uint256) public createdAt;
     mapping (uint256 => address) public topHolder;
     mapping(uint256 => mapping(address => uint256)) liquidityLastAdded;
 
@@ -26,20 +27,25 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     receive() external payable {
     }
 
-    function mint (address account, uint256 id, uint256 amount) public onlyOwner {
-      totalSupply[id]=totalSupply[id].add(amount);
+    function mint (address account, uint256 id, uint256 amount, uint256 _createdAt, bool _isOfficial) public onlyOwner {
+      if (createdAt[id] == 0) 
+        createdAt[id] = _createdAt;
+
+      totalSupply[id] = totalSupply[id].add(amount);
       
       liquidityLastAdded[id][account] = block.timestamp;
       _mint(account, id, amount, "");
-      uint256 liquidityAmount = balanceOf(account, id);
-      uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
-      if (liquidityAmount > topHolderAmount) {
-        topHolder[id] = account;
+      if (!_isOfficial || _createdAt + 90 days > block.timestamp) {
+        uint256 liquidityAmount = balanceOf(account, id);
+        uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
+        if (liquidityAmount > topHolderAmount) {
+          topHolder[id] = account;
+        }
       }
     }                                
 
     function burn (address account, uint256 id, uint256 amount) public onlyOwner {
-      totalSupply[id]=totalSupply[id].sub(amount);
+      totalSupply[id] = totalSupply[id].sub(amount);
       _burn(account, id, amount);
     }
 
@@ -54,7 +60,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(msg.sender != topHolder[id], "MonoXPool:TOP HOLDER");
+      require(!(from == topHolder[id] && createdAt[id] + 90 days > block.timestamp), "MonoXPool:TOP HOLDER");
       super.safeTransferFrom(from, to, id, amount, data);
     }
 
