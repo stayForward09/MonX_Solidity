@@ -68,7 +68,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(!(isOfficial[id] == false && from == topHolder[id] && createdAt[id] + 90 days > block.timestamp), "MonoXPool:TOP HOLDER");
+      require(isOfficial[id] == true || from != topHolder[id] || createdAt[id] + 90 days < block.timestamp, "MonoXPool:TOP HOLDER");
       super.safeTransferFrom(from, to, id, amount, data);
     }
 
