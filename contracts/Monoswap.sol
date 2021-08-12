@@ -35,7 +35,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   uint256 constant MINIMUM_LIQUIDITY=100;
   
-
   struct PoolInfo {
     uint256 pid;
     uint256 lastPoolValue;
@@ -45,6 +44,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint112 vusdCredit;
     uint112 tokenBalance;
     uint256 price; // over 1e18
+    uint256 createdAt; // timestamp
   }
 
   enum TxType {
@@ -155,6 +155,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // ------------
   uint public poolSizeMinLimit;
 
+
   function initialize(IMonoXPool _monoXPool, IvUSD _vusd) public initializer {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
@@ -197,7 +198,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function setTokenStatus (address _token, uint8 _status) onlyOwner external {
     tokenStatus[_token] = _status;
   } 
-  
 
   // update status of a pool. onlyOwner.
   function updatePoolStatus(address _token, PoolStatus _status) external onlyOwner {    
@@ -296,7 +296,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       tokenBalance: 0,
       lastPoolValue: 0,
       status: _status,
-      price: _price
+      price: _price,
+      createdAt: block.timestamp
     });
 
     poolSize = _pid.add(1);
@@ -362,14 +363,14 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     require (tokenAmount>0, "MonoX:BAD_AMOUNT");
 
     require(tokenPoolStatus[_token]==1, "MonoX:NO_POOL");
-
+    
     // (uint256 poolValue, , ,) = getPool(_token);
     PoolInfo memory pool = pools[_token];
-
+    IMonoXPool monoXPoolLocal = monoXPool;
+    
     uint256 poolValue = pool.price.mul(pool.tokenBalance)/1e18;
     poolValue = poolValue.add(pool.vusdCredit).sub(pool.vusdDebt);
 
-    IMonoXPool monoXPoolLocal = monoXPool;
     
     _mintFee(pool.pid, pool.lastPoolValue, poolValue);
 
@@ -389,13 +390,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         liquidityVusdValue = liquidityVusdValue/1e6; // so $1m would get you 1e18
         liquidity = liquidityVusdValue.sub(MINIMUM_LIQUIDITY);
         // sorry, oz doesn't allow minting to address(0)
-        monoXPoolLocal.mint(feeTo, pool.pid, MINIMUM_LIQUIDITY); 
+        monoXPoolLocal.mintLp(feeTo, pool.pid, MINIMUM_LIQUIDITY, pool.status == PoolStatus.LISTED); 
       }else{
         liquidity = _totalSupply.mul(liquidityVusdValue).div(poolValue);
       }
     }
-
-    monoXPoolLocal.mint(to, pool.pid, liquidity);
+    
+    monoXPoolLocal.mintLp(to, pool.pid, liquidity, pool.status == PoolStatus.LISTED);
     _syncPoolInfo(_token, vusdAmount, 0);
 
     emit AddLiquidity(to, 
@@ -443,6 +444,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vusdCredit;
     uint256 vusdDebt;
     PoolInfo memory pool = pools[_token];
+    IMonoXPool monoXPoolLocal = monoXPool;
+    uint256 lastAdded = monoXPoolLocal.liquidityLastAddedOf(pool.pid, msg.sender);
+    
+    require((lastAdded + (pool.status == PoolStatus.OFFICIAL ? 4 hours : pool.status == PoolStatus.LISTED ? 24 hours : 0)) <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
+    address topLPHolder = monoXPoolLocal.topLPHolderOf(pool.pid);
+    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
+
     (poolValue, tokenBalanceVusdValue, vusdCredit, vusdDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
