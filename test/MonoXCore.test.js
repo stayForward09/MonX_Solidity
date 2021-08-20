@@ -836,9 +836,13 @@ describe('MonoX Core', function () {
 
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address)
+        
         await expect(this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')))
             .to.be.revertedWith("MonoXPool:WRONG_TIME")
+        await this.pool.setWhitelister(this.alice.address, true)
+        await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii(''))
         await time.increase(60 * 60 * 24)
+        await this.pool.setWhitelister(this.alice.address, false)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
         liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 

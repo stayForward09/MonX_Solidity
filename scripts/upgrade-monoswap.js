@@ -16,6 +16,7 @@ async function main() {
   const monoswap = await upgrades.upgradeProxy(process.env.MONOSWAP_CORE_ADDRESS, Monoswap)
   console.log("Monoswap address:", monoswap.address)
   await monoswap.deployed()
+  await monoswap.setWhitelister(process.env.MONOSWAP_STAKING_ADDRESS)
   
   const oz_monoswap = require("../.openzeppelin/" + network + ".json")
   const implsLen = Object.keys(oz_monoswap.impls).length;

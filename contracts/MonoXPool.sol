@@ -19,7 +19,8 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     mapping (uint256 => uint256) public createdAt;
     mapping (uint256 => bool) public isUnofficial;
     mapping (uint256 => address) public topHolder;
-    mapping(uint256 => mapping(address => uint256)) liquidityLastAdded;
+    mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
+    mapping (address => bool) whitelists;
 
     constructor (address _WETH) {
       WETH = _WETH;
@@ -62,12 +63,14 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
-      if (isUnofficial[id])
-        require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
-      else 
-        require(liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
-      liquidityLastAdded[id][to] = block.timestamp;
+      if (!whitelists[to]) {
+        require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
+        if (isUnofficial[id])
+          require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+        else 
+          require(liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+        liquidityLastAdded[id][to] = block.timestamp;
+      }
 
       super.safeTransferFrom(from, to, id, amount, data);
       
@@ -93,6 +96,11 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     function safeTransferERC20Token(address token, address to, uint256 amount) external onlyOwner{
       IERC20(token).safeTransfer(to, amount);
     }
+
+    function setWhitelister(address _whitelister, bool _isWhitelister) external onlyOwner {
+      whitelists[_whitelister] = _isWhitelister;  
+    }
+
 
     function getWETHAddr() external view returns (address) {
       return address(WETH);

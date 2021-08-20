@@ -903,6 +903,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   }
 
+  function setWhitelister(address _whitelister, bool _isWhitelister) external onlyOwner {
+    monoXPool.setWhitelister(_whitelister, _isWhitelister);
+  }
   // function balanceOf(address account, uint256 id) public view returns (uint256) {
   //   return monoXPool.balanceOf(account, id);
   // }
