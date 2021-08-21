@@ -8,9 +8,10 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import './interfaces/IWETH.sol';
 
-contract MonoXPool is ERC1155("{1}"), Ownable {
+contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -21,6 +22,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     mapping (uint256 => address) public topHolder;
     mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
     mapping (address => bool) whitelists;
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor (address _WETH) {
       WETH = _WETH;
@@ -97,7 +99,8 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       IERC20(token).safeTransfer(to, amount);
     }
 
-    function setWhitelister(address _whitelister, bool _isWhitelister) external onlyOwner {
+    function setWhitelister(address _whitelister, bool _isWhitelister) external {
+      require(hasRole(MINTER_ROLE, msg.sender), "MonoXPool:NOT_MINTER_ROLE");
       whitelists[_whitelister] = _isWhitelister;  
     }
 
@@ -122,5 +125,9 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
           topHolder[id] = account;
         }
       }
+    }
+
+    function setMinter(address _minter) public onlyOwner {
+        _setupRole(MINTER_ROLE, _minter);
     }
 }

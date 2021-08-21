@@ -48,10 +48,11 @@ async function main() {
   await monoswap.deployed()
   
   await vusd.transferOwnership(monoswap.address)
+  await monoXPool.setMinter(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
   const devAddr = deployer.address
   await monoswap.setFeeTo(devAddr)
-  await monoswap.setWhitelister(process.env.MONOSWAP_STAKING_ADDRESS)
+  await monoXPool.setWhitelister(process.env.MONOSWAP_STAKING_ADDRESS, true)
   
   await hre.run("verify:verify", {
     address: vusd.address,
