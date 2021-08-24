@@ -21,8 +21,8 @@ contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
     mapping (uint256 => bool) public isUnofficial;
     mapping (uint256 => address) public topHolder;
     mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
-    mapping (address => bool) whitelists;
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    mapping (address => bool) whitelist;
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     constructor (address _WETH) {
       WETH = _WETH;
@@ -65,7 +65,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
         virtual
         override
     {
-      if (!whitelists[to]) {
+      if (!whitelist[to]) {
         require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
         if (isUnofficial[id])
           require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
@@ -99,9 +99,9 @@ contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
       IERC20(token).safeTransfer(to, amount);
     }
 
-    function setWhitelister(address _whitelister, bool _isWhitelister) external {
-      require(hasRole(MINTER_ROLE, msg.sender), "MonoXPool:NOT_MINTER_ROLE");
-      whitelists[_whitelister] = _isWhitelister;  
+    function setWhitelist(address _whitelist, bool _isWhitelist) external {
+      require(hasRole(ADMIN_ROLE, msg.sender), "MonoXPool:NOT_ADMIN_ROLE");
+      whitelist[_whitelist] = _isWhitelist;  
     }
 
 
@@ -127,7 +127,7 @@ contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
       }
     }
 
-    function setMinter(address _minter) public onlyOwner {
-        _setupRole(MINTER_ROLE, _minter);
+    function setAdmin(address _admin) public onlyOwner {
+        _setupRole(ADMIN_ROLE, _admin);
     }
 }

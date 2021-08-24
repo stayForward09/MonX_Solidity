@@ -25,5 +25,5 @@ interface IMonoXPool is IERC1155 {
 
     function mintLp(address account, uint256 id, uint256 amount, bool _isOfficial) external;
 
-    function setWhitelister(address _whitelister, bool _isWhitelister) external;
+    function setWhitelist(address _whitelister, bool _isWhitelister) external;
 }

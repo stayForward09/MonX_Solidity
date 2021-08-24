@@ -65,7 +65,7 @@ describe('MonoX Core', function () {
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address],{unsafeAllowLinkedLibraries:true})
         this.vusd.transferOwnership(this.pool.address)
-        this.monoXPool.setMinter(this.minter.address)
+        this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
 
@@ -840,10 +840,10 @@ describe('MonoX Core', function () {
         
         await expect(this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')))
             .to.be.revertedWith("MonoXPool:WRONG_TIME")
-        await this.monoXPool.connect(this.minter).setWhitelister(this.alice.address, true)
+        await this.monoXPool.connect(this.minter).setWhitelist(this.alice.address, true)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii(''))
         await time.increase(60 * 60 * 24)
-        await this.monoXPool.connect(this.minter).setWhitelister(this.alice.address, false)
+        await this.monoXPool.connect(this.minter).setWhitelist(this.alice.address, false)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
         liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 
