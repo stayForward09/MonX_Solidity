@@ -11,18 +11,17 @@ async function main() {
   
   console.log("Account balance:", (await deployer.getBalance()).toString())
   const network = (await ethers.provider.getNetwork()).name
-  const Monoswap = await ethers.getContractFactory("Monoswap")
+  const MonoXPool = await ethers.getContractFactory("MonoXPool")
 
-  const monoswap = await upgrades.upgradeProxy(process.env.MONOSWAP_CORE_ADDRESS, Monoswap)
-  console.log("Monoswap address:", monoswap.address)
-  await monoswap.deployed()
+  const monoXPool = await upgrades.upgradeProxy(process.env.MONOXPOOL_ADDRESS, MonoXPool)
+  console.log("MonoXPool address:", monoXPool.address)
+  await monoXPool.deployed()
   
   const oz_monoswap = require("../.openzeppelin/" + network + ".json")
-  // const implsLen = Object.keys(oz_monoswap.impls).length;
-  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[1]].address
-  console.log("Monoswap Impl Address", monoswapImplAddress)
+  const monoXPoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
+  console.log("MonoXPool Impl Address", monoXPoolImplAddress)
   await hre.run("verify:verify", {
-    address: monoswapImplAddress,
+    address: monoXPoolImplAddress,
     constructorArguments: [
     ],
   })
