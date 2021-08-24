@@ -61,7 +61,8 @@ describe('MonoX Core', function () {
         await this.uni.transfer( this.bob.address, bigNum(10000000))
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
         await this.comp.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
-        this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
+        // this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
+        this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
         // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address],{unsafeAllowLinkedLibraries:true})
         this.vusd.transferOwnership(this.pool.address)

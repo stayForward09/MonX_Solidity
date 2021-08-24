@@ -2,6 +2,10 @@
 
 pragma solidity ^0.7.6;
 
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -11,7 +15,7 @@ import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import './interfaces/IWETH.sol';
 
-contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
+contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable, AccessControlUpgradeable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -24,7 +28,12 @@ contract MonoXPool is ERC1155("{1}"), Ownable, AccessControl {
     mapping (address => bool) whitelist;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    constructor (address _WETH) {
+    function initialize(
+      address _WETH
+    ) public initializer {
+      OwnableUpgradeable.__Ownable_init();
+      AccessControlUpgradeable.__AccessControl_init();
+      ERC1155Upgradeable.__ERC1155_init("{1}");
       WETH = _WETH;
     }
 
