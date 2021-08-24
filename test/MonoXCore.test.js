@@ -25,18 +25,20 @@ const overrides = {
 const DEFAULT_ETH_AMOUNT = 10000000000
 describe('MonoX Core', function () {
     before(async function () {
-        this.signers = await ethers.getSigners()
-        this.alice = this.signers[0]
-        this.bob = this.signers[1]
-        this.carol = this.signers[2]
-        this.dev = this.signers[3]
-        this.minter = this.signers[4]
+        [
+            this.owner, 
+            this.alice,
+            this.bob,
+            this.carol,
+            this.minter,
+            this.dev,
+            ...addrs
+          ] = await ethers.getSigners();
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
         this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vUSD = await ethers.getContractFactory('VUSD');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
-        
     })
     
     beforeEach(async function () {
@@ -54,16 +56,15 @@ describe('MonoX Core', function () {
         await this.dai.transfer(this.alice.address, bigNum(10000000))
         await this.uni.transfer(this.alice.address, bigNum(10000000))
         await this.aave.transfer(this.alice.address, bigNum(10000000))  //alice will initiate the pool
+        await this.comp.transfer(this.alice.address, bigNum(10000000))
 
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
         await this.uni.transfer( this.bob.address, bigNum(10000000))
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
-        await this.comp.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
-        // this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
+        await this.comp.transfer(this.bob.address, bigNum(10000000))  
         this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
-        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vusd.address, this.weth.address)
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address],{unsafeAllowLinkedLibraries:true})
         this.vusd.transferOwnership(this.pool.address)
         this.monoXPool.setAdmin(this.minter.address)
@@ -860,5 +861,11 @@ describe('MonoX Core', function () {
         
         await time.increase(60 * 60 * 4)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 3, bigNum(1), web3.utils.fromAscii('')) 
+    });
+
+    it('should transfer admin role', async function () {
+        expect(await this.monoXPool.admin()).to.equal(this.minter.address)
+        await this.monoXPool.connect(this.minter).setAdmin(this.alice.address)
+        expect(await this.monoXPool.admin()).to.equal(this.alice.address)
     });
 });

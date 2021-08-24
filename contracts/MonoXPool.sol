@@ -4,18 +4,14 @@ pragma solidity ^0.7.6;
 
 import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import './interfaces/IWETH.sol';
 
-contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable, AccessControlUpgradeable {
+contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -26,17 +22,21 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable, Acc
     mapping (uint256 => address) public topHolder;
     mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
     mapping (address => bool) whitelist;
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    address public admin;
 
     function initialize(
       address _WETH
     ) public initializer {
       OwnableUpgradeable.__Ownable_init();
-      AccessControlUpgradeable.__AccessControl_init();
       ERC1155Upgradeable.__ERC1155_init("{1}");
       WETH = _WETH;
+      admin = msg.sender;
     }
 
+    modifier onlyAdmin() {
+      require(admin == msg.sender, "MonoXPool:NOT_ADMIN");
+      _;
+    }
     receive() external payable {
     }
 
@@ -108,8 +108,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable, Acc
       IERC20(token).safeTransfer(to, amount);
     }
 
-    function setWhitelist(address _whitelist, bool _isWhitelist) external {
-      require(hasRole(ADMIN_ROLE, msg.sender), "MonoXPool:NOT_ADMIN_ROLE");
+    function setWhitelist(address _whitelist, bool _isWhitelist) external onlyAdmin {
       whitelist[_whitelist] = _isWhitelist;  
     }
 
@@ -136,7 +135,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable, Acc
       }
     }
 
-    function setAdmin(address _admin) public onlyOwner {
-        _setupRole(ADMIN_ROLE, _admin);
+    function setAdmin(address _admin) public onlyAdmin {
+        admin = _admin;
     }
 }
