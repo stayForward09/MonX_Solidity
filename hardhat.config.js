@@ -45,6 +45,33 @@ task("set-official-pool", "Sets a pool to official")
   console.log("success");
 })
 
+task("set-whitelist", "Sets whitelist")
+  .addParam("monoxpool", "MonoXPool's address")
+  .addParam("staking", "pool token address")
+  .setAction(async (args) => {
+
+  const [deployer] = await ethers.getSigners();
+
+  if(!(ethers.utils.isAddress(args.monoxpool) && ethers.utils.isAddress(args.staking))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  );
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  
+  const MonoXPool = await ethers.getContractFactory("MonoXPool")
+  const monoXPool = await MonoXPool.attach(args.monoxpool);
+  await monoXPool.setWhitelist(args.staking, true)
+  await monoXPool.setWhitelist(deployer.address, true) // deployer.address is owner
+
+  console.log("success");
+})
+
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
