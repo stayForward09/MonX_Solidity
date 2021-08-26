@@ -72,6 +72,86 @@ task("set-whitelist", "Sets whitelist")
   console.log("success");
 })
 
+task("upgrade-monoxpool", "Upgrade MonoXPool contract")
+  .addParam("monoxpool", "MonoXPool's address")
+  .setAction(async (args) => {
+
+  if(!(ethers.utils.isAddress(args.monoxpool))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+
+  const [deployer] = await ethers.getSigners()
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  )
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString())
+  const network = (await ethers.provider.getNetwork())
+  const MonoXPool = await ethers.getContractFactory("MonoXPool")
+
+  const monoXPool = await upgrades.upgradeProxy(args.monoxpool, MonoXPool)
+  console.log("MonoXPool address:", monoXPool.address)
+  await monoXPool.deployed()
+  
+  const oz_monoswap = require("./.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
+  const monoXPoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
+  console.log("MonoXPool Impl Address", monoXPoolImplAddress)
+  try {
+    await hre.run("verify:verify", {
+      address: monoXPoolImplAddress,
+      constructorArguments: [
+      ],
+    })
+  } catch (e) {
+    console.log(e)
+  }
+
+  console.log("success");
+})
+
+task("upgrade-monoswap", "Upgrade Monoswap contract")
+  .addParam("monoswap", "Monoswap's address")
+  .setAction(async (args) => {
+
+  if(!(ethers.utils.isAddress(args.monoswap))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+
+  const [deployer] = await ethers.getSigners()
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  )
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString())
+  const network = (await ethers.provider.getNetwork())
+  const Monoswap = await ethers.getContractFactory("Monoswap")
+
+  const monoswap = await upgrades.upgradeProxy(args.monoswap, Monoswap)
+  console.log("Monoswap address:", monoswap.address)
+  await monoswap.deployed()
+  
+  const oz_monoswap = require("./.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
+  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[1]].address
+  console.log("Monoswap Impl Address", monoswapImplAddress)
+  try {
+    await hre.run("verify:verify", {
+      address: monoswapImplAddress,
+      constructorArguments: [
+      ],
+    })
+  } catch (e) {
+    console.log(e)
+  }
+
+  console.log("success");
+})
+
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
