@@ -17,7 +17,7 @@ interface IMonoXPool is IERC1155 {
 
     function safeTransferERC20Token(address token, address to, uint256 amount) external;
 
-    function getWETHAddr() external view returns (address);
+    function WETH() external view returns (address);
 
     function liquidityLastAddedOf(uint256 pid, address account) external view returns(uint256);
 

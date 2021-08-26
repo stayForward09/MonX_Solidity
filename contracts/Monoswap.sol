@@ -160,7 +160,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vUSD = _vusd;
-    WETH = _monoXPool.getWETHAddr();
+    WETH = _monoXPool.WETH();
 
     fees = 300;
     devFee = 50;

@@ -111,12 +111,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     function setWhitelist(address _whitelist, bool _isWhitelist) external onlyAdmin {
       whitelist[_whitelist] = _isWhitelist;  
     }
-
-
-    function getWETHAddr() external view returns (address) {
-      return address(WETH);
-    }
-
+    
     function liquidityLastAddedOf(uint256 pid, address account) external view returns (uint256) {
       return liquidityLastAdded[pid][account];
     }
