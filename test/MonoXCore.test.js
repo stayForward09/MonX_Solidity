@@ -25,18 +25,20 @@ const overrides = {
 const DEFAULT_ETH_AMOUNT = 10000000000
 describe('MonoX Core', function () {
     before(async function () {
-        this.signers = await ethers.getSigners()
-        this.alice = this.signers[0]
-        this.bob = this.signers[1]
-        this.carol = this.signers[2]
-        this.dev = this.signers[3]
-        this.minter = this.signers[4]
+        [
+            this.owner, 
+            this.alice,
+            this.bob,
+            this.carol,
+            this.minter,
+            this.dev,
+            ...addrs
+          ] = await ethers.getSigners();
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
         this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vCASH = await ethers.getContractFactory('VCASH');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
-        
     })
     
     beforeEach(async function () {
@@ -54,17 +56,18 @@ describe('MonoX Core', function () {
         await this.dai.transfer(this.alice.address, bigNum(10000000))
         await this.uni.transfer(this.alice.address, bigNum(10000000))
         await this.aave.transfer(this.alice.address, bigNum(10000000))  //alice will initiate the pool
+        await this.comp.transfer(this.alice.address, bigNum(10000000))
 
         await this.weth.transfer( this.bob.address, bigNum(10000000))
         await this.yfi.transfer( this.bob.address, bigNum(10000000))
         await this.dai.transfer( this.bob.address, bigNum(10000000))
         await this.uni.transfer( this.bob.address, bigNum(10000000))
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
-        await this.comp.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
-        this.monoXPool = await this.MonoXPool.deploy(this.weth.address)
-        // this.pool = await this.Monoswap.deploy(this.monoXPool.address, this.vcash.address, this.weth.address)
+        await this.comp.transfer(this.bob.address, bigNum(10000000))  
+        this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vcash.address],{unsafeAllowLinkedLibraries:true})
         this.vcash.transferOwnership(this.pool.address)
+        this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
 
@@ -836,9 +839,13 @@ describe('MonoX Core', function () {
 
         await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address)
+        
         await expect(this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')))
             .to.be.revertedWith("MonoXPool:WRONG_TIME")
+        await this.monoXPool.connect(this.minter).setWhitelist(this.alice.address, true)
+        await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii(''))
         await time.increase(60 * 60 * 24)
+        await this.monoXPool.connect(this.minter).setWhitelist(this.alice.address, false)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')) 
         liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 
@@ -854,5 +861,11 @@ describe('MonoX Core', function () {
         
         await time.increase(60 * 60 * 4)
         await this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 3, bigNum(1), web3.utils.fromAscii('')) 
+    });
+
+    it('should transfer admin role', async function () {
+        expect(await this.monoXPool.admin()).to.equal(this.minter.address)
+        await this.monoXPool.connect(this.minter).setAdmin(this.alice.address)
+        expect(await this.monoXPool.admin()).to.equal(this.alice.address)
     });
 });

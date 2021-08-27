@@ -160,8 +160,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     OwnableUpgradeable.__Ownable_init();
     monoXPool = _monoXPool;
     vCash = _vcash;
-    WETH = _monoXPool.getWETHAddr();
-
+    WETH = _monoXPool.WETH();
     fees = 300;
     devFee = 50;
     poolSize = 0;
@@ -902,7 +901,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVcashValue);
 
   }
-
   // function balanceOf(address account, uint256 id) public view returns (uint256) {
   //   return monoXPool.balanceOf(account, id);
   // }

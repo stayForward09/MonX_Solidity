@@ -2,15 +2,16 @@
 
 pragma solidity ^0.7.6;
 
-import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/ERC1155Upgradeable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import '@uniswap/lib/contracts/libraries/TransferHelper.sol';
 import './interfaces/IWETH.sol';
 
-contract MonoXPool is ERC1155("{1}"), Ownable {
+contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -19,12 +20,23 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
     mapping (uint256 => uint256) public createdAt;
     mapping (uint256 => bool) public isUnofficial;
     mapping (uint256 => address) public topHolder;
-    mapping(uint256 => mapping(address => uint256)) liquidityLastAdded;
+    mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
+    mapping (address => bool) whitelist;
+    address public admin;
 
-    constructor (address _WETH) {
+    function initialize(
+      address _WETH
+    ) public initializer {
+      OwnableUpgradeable.__Ownable_init();
+      ERC1155Upgradeable.__ERC1155_init("{1}");
       WETH = _WETH;
+      admin = msg.sender;
     }
 
+    modifier onlyAdmin() {
+      require(admin == msg.sender, "MonoXPool:NOT_ADMIN");
+      _;
+    }
     receive() external payable {
     }
 
@@ -62,12 +74,14 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
         virtual
         override
     {
-      require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
-      if (isUnofficial[id])
-        require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
-      else 
-        require(liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
-      liquidityLastAdded[id][to] = block.timestamp;
+      if (!whitelist[to]) {
+        require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
+        if (isUnofficial[id])
+          require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+        else 
+          require(liquidityLastAdded[id][from] + 4 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
+        liquidityLastAdded[id][to] = block.timestamp;
+      }
 
       super.safeTransferFrom(from, to, id, amount, data);
       
@@ -94,10 +108,10 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
       IERC20(token).safeTransfer(to, amount);
     }
 
-    function getWETHAddr() external view returns (address) {
-      return address(WETH);
+    function setWhitelist(address _whitelist, bool _isWhitelist) external onlyAdmin {
+      whitelist[_whitelist] = _isWhitelist;  
     }
-
+    
     function liquidityLastAddedOf(uint256 pid, address account) external view returns (uint256) {
       return liquidityLastAdded[pid][account];
     }
@@ -114,5 +128,9 @@ contract MonoXPool is ERC1155("{1}"), Ownable {
           topHolder[id] = account;
         }
       }
+    }
+
+    function setAdmin(address _admin) public onlyAdmin {
+        admin = _admin;
     }
 }

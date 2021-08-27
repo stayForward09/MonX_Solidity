@@ -43,14 +43,15 @@ async function main() {
   console.log("MonoXPool address:", monoXPool.address)
   const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vcash.address])
   console.log("Monoswap address:", monoswap.address)
+
   await vcash.deployed()
   await monoXPool.deployed()
   await monoswap.deployed()
-  
+
   await vcash.transferOwnership(monoswap.address)
+  await monoXPool.setAdmin(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
-  const devAddr = deployer.address
-  await monoswap.setFeeTo(devAddr)
+  await monoswap.setFeeTo(deployer.address)
   
   await hre.run("verify:verify", {
     address: vcash.address,
@@ -58,22 +59,30 @@ async function main() {
     ],
   })
 
-  await hre.run("verify:verify", {
-    address: monoXPool.address,
-    constructorArguments: [
-      WETH
-    ],
-  })
   const oz_monoswap = require("../.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
-  const implsLen = Object.keys(oz_monoswap.impls).length;
-  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen-1]].address
-  console.log("Monoswap Impl Address", monoswapImplAddress)
-  await hre.run("verify:verify", {
-    address: monoswapImplAddress,
-    constructorArguments: [
-    ],
-  })
+  const monoxpoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
+  console.log("MonoXPool Impl Address", monoxpoolImplAddress)
+  try {
+    await hre.run("verify:verify", {
+      address: monoxpoolImplAddress,
+      constructorArguments: [
+      ],
+    })
+  } catch (e) {
+    console.log(e)
+  }
 
+  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[1]].address
+  console.log("Monoswap Impl Address", monoswapImplAddress)
+  try {
+    await hre.run("verify:verify", {
+      address: monoswapImplAddress,
+      constructorArguments: [
+      ],
+    })  
+  } catch (e) {
+    console.log(e)
+  }
 }
 
 main()
