@@ -13,7 +13,7 @@ async function main() {
   const network = await ethers.provider.getNetwork()
   const MonoXPool = await ethers.getContractFactory("MonoXPool")
   const Monoswap = await ethers.getContractFactory("Monoswap")
-  const VUSD = await ethers.getContractFactory('VUSD')
+  const VCASH = await ethers.getContractFactory('VCASH')
   let WETH
   switch (network.chainId) {
     case 1: // mainnet
@@ -37,23 +37,23 @@ async function main() {
     default:
       throw new Error("unknown network");
   }
-  const vusd = await VUSD.deploy()
-  console.log("VUSD address:", vusd.address)
+  const vcash = await VCASH.deploy()
+  console.log("VCASH address:", vcash.address)
   const monoXPool = await MonoXPool.deploy(WETH)
   console.log("MonoXPool address:", monoXPool.address)
-  const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vusd.address])
+  const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vcash.address])
   console.log("Monoswap address:", monoswap.address)
-  await vusd.deployed()
+  await vcash.deployed()
   await monoXPool.deployed()
   await monoswap.deployed()
   
-  await vusd.transferOwnership(monoswap.address)
+  await vcash.transferOwnership(monoswap.address)
   await monoXPool.transferOwnership(monoswap.address)
   const devAddr = deployer.address
   await monoswap.setFeeTo(devAddr)
   
   await hre.run("verify:verify", {
-    address: vusd.address,
+    address: vcash.address,
     constructorArguments: [
     ],
   })
