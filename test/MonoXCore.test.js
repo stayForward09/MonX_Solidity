@@ -37,7 +37,7 @@ describe('MonoX Core', function () {
         this.Monoswap = await ethers.getContractFactory('Monoswap');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
         this.WETH9 = await ethers.getContractFactory('WETH9');
-        this.vUSD = await ethers.getContractFactory('VUSD');
+        this.vCASH = await ethers.getContractFactory('VCASH');
         this.MonoXPool = await ethers.getContractFactory('MonoXPool');
     })
     
@@ -48,7 +48,7 @@ describe('MonoX Core', function () {
         this.uni = await this.MockERC20.deploy('UNI', 'UNI', e26);
         this.aave = await this.MockERC20.deploy('Aave','AAVE',e26); // used to test if exploit is possible at low value of the pool
         this.comp = await this.MockERC20.deploy('Compound','COMP',e26); 
-        this.vusd = await this.vUSD.deploy();
+        this.vcash = await this.vCASH.deploy();
 
         await this.weth.deposit({value: bigNum(100000000)})
         await this.weth.transfer(this.alice.address, bigNum(10000000))
@@ -65,8 +65,8 @@ describe('MonoX Core', function () {
         await this.aave.transfer(this.bob.address, bigNum(10000000))  //bob will sell and take the price down
         await this.comp.transfer(this.bob.address, bigNum(10000000))  
         this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
-        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vusd.address],{unsafeAllowLinkedLibraries:true})
-        this.vusd.transferOwnership(this.pool.address)
+        this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vcash.address],{unsafeAllowLinkedLibraries:true})
+        this.vcash.transferOwnership(this.pool.address)
         this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
@@ -79,14 +79,14 @@ describe('MonoX Core', function () {
         await this.uni.connect(this.alice).approve(this.pool.address, e26);
         await this.aave.connect(this.alice).approve(this.pool.address, e26);    //alice approval
         await this.aave.approve(this.pool.address, e26);    //owner approval
-        await this.vusd.connect(this.alice).approve(this.pool.address, e26);
+        await this.vcash.connect(this.alice).approve(this.pool.address, e26);
         await this.comp.connect(this.alice).approve(this.pool.address, e26);
 
         await this.weth.connect(this.bob).approve(this.pool.address, e26);
         await this.yfi.connect(this.bob).approve(this.pool.address, e26);
         await this.dai.connect(this.bob).approve(this.pool.address, e26);
         await this.uni.connect(this.bob).approve(this.pool.address, e26);
-        await this.vusd.connect(this.bob).approve(this.pool.address, e26);
+        await this.vcash.connect(this.bob).approve(this.pool.address, e26);
         await this.aave.connect(this.bob).approve(this.pool.address, e26);    //bob approval
         await this.comp.connect(this.bob).approve(this.pool.address, e26);
 
@@ -119,7 +119,7 @@ describe('MonoX Core', function () {
 
     // it("should set correct state variables", async function () {
     //     const config = await this.pool.getConfig()
-    //     expect(config._vUSD).to.equal(this.vusd.address)
+    //     expect(config._vCASH).to.equal(this.vcash.address)
     //     expect(config._feeTo).to.equal(this.dev.address)
     //     expect(config._fees).to.equal(300)
     //     expect(config._devFee).to.equal(50)
@@ -197,18 +197,18 @@ describe('MonoX Core', function () {
 
     });
 
-    it('should purchase and sell vUSD successfully', async function () {
+    it('should purchase and sell vCASH successfully', async function () {
 
         const deadline = (await time.latest()) + 10000
 
         await this.pool.connect(this.bob).swapExactTokenForToken(
-            this.uni.address, this.vusd.address, 
+            this.uni.address, this.vcash.address, 
             bigNum(20), bigNum(400),  this.bob.address, deadline)
 
-        let vusdbob0 = smallNum((await this.vusd.balanceOf(this.bob.address)).toString())
+        let vcashbob0 = smallNum((await this.vcash.balanceOf(this.bob.address)).toString())
 
-        expect(vusdbob0).to.greaterThan(550)
-        expect(vusdbob0).to.lessThan(600)
+        expect(vcashbob0).to.greaterThan(550)
+        expect(vcashbob0).to.lessThan(600)
         
         let uniPool = await this.pool.pools(this.uni.address)
         let uniPrice0 = smallNum(uniPool.price.toString())
@@ -217,13 +217,13 @@ describe('MonoX Core', function () {
         expect(uniPrice0).to.lessThan(30)
 
         await this.pool.connect(this.bob).swapTokenForExactToken(
-            this.vusd.address, this.uni.address, 
+            this.vcash.address, this.uni.address, 
             bigNum(350), bigNum(10),  this.bob.address, deadline)
 
-        let vusdbob1 = smallNum((await this.vusd.balanceOf( this.bob.address)).toString())
+        let vcashbob1 = smallNum((await this.vcash.balanceOf( this.bob.address)).toString())
 
-        expect(vusdbob0-vusdbob1).to.greaterThan(300)
-        expect(vusdbob0-vusdbob1).to.lessThan(302)
+        expect(vcashbob0-vcashbob1).to.greaterThan(300)
+        expect(vcashbob0-vcashbob1).to.lessThan(302)
 
         uniPool = await this.pool.pools(this.uni.address)
         const uniPrice1 = smallNum(uniPool.price.toString())
@@ -247,12 +247,12 @@ describe('MonoX Core', function () {
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0);
 
-        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+        let vcashAmount = await this.vcash.balanceOf(this.alice.address)
 
-        expect(smallNum(vusdAmount.toString())).to.greaterThan(50*250)
-        expect(smallNum(vusdAmount.toString())).to.lessThan(50*300)
+        expect(smallNum(vcashAmount.toString())).to.greaterThan(50*250)
+        expect(smallNum(vcashAmount.toString())).to.lessThan(50*300)
 
-        let devFee = await this.vusd.balanceOf(this.dev.address)
+        let devFee = await this.vcash.balanceOf(this.dev.address)
         console.log(smallNum(devFee.toString()))
     });
 
@@ -276,12 +276,12 @@ describe('MonoX Core', function () {
         const results = await this.pool.connect(this.alice).removeLiquidity(
             this.uni.address, liquidity, this.alice.address, 0, 0);
 
-        let vusdAmount = await this.vusd.balanceOf(this.alice.address)
+        let vcashAmount = await this.vcash.balanceOf(this.alice.address)
 
-        expect(smallNum(vusdAmount.toString())).to.greaterThan(500*25/2)
-        expect(smallNum(vusdAmount.toString())).to.lessThan(500*30/2)
+        expect(smallNum(vcashAmount.toString())).to.greaterThan(500*25/2)
+        expect(smallNum(vcashAmount.toString())).to.lessThan(500*30/2)
 
-        let devFee = await this.vusd.balanceOf(this.dev.address)
+        let devFee = await this.vcash.balanceOf(this.dev.address)
         console.log(smallNum(devFee.toString()))
     });
 
@@ -298,10 +298,10 @@ describe('MonoX Core', function () {
         const results = await this.pool.connect(this.bob).removeLiquidityETH(
             liquidity, this.bob.address, 0, 0);
 
-        let vusdAmount = await this.vusd.balanceOf(this.bob.address)
+        let vcashAmount = await this.vcash.balanceOf(this.bob.address)
         const ethAmount = await ethers.provider.getBalance(this.bob.address)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(1) // consider gas fee
-        expect(smallNum(vusdAmount.toString())).to.equal(0)
+        expect(smallNum(vcashAmount.toString())).to.equal(0)
     });
 
     it('should list new tokens successfully', async function () {
@@ -650,8 +650,8 @@ describe('MonoX Core', function () {
         const bobETHAfterSale =await ethers.provider.getBalance(this.bob.address);
    
         const poolInfo = await this.pool.getPool(this.aave.address);
-        console.log('poolinfoBefore',poolInfo.poolValue.toString(),poolInfo.vusdDebt.toString(),poolInfo.vusdCredit.toString(),poolInfo.tokenBalanceVusdValue.toString());
-        expect(poolInfo.vusdDebt.toString()).to.equal('100207967701922338036149');    // debt is 100207967701922338036149
+        console.log('poolinfoBefore',poolInfo.poolValue.toString(),poolInfo.vcashDebt.toString(),poolInfo.vcashCredit.toString(),poolInfo.tokenBalanceVcashValue.toString());
+        expect(poolInfo.vcashDebt.toString()).to.equal('100207967701922338036149');    // debt is 100207967701922338036149
    
         const aliceBalanceBeforeRebalancing=await this.aave.balanceOf(this.alice.address);
         
@@ -663,7 +663,7 @@ describe('MonoX Core', function () {
 
         const poolInfoAfterBalance = await this.pool.getPool(this.aave.address);  
         
-        console.log('poolinfoAfter',poolInfoAfterBalance.poolValue.toString(),poolInfoAfterBalance.vusdDebt.toString(),poolInfoAfterBalance.vusdCredit.toString(),poolInfoAfterBalance.tokenBalanceVusdValue.toString());
+        console.log('poolinfoAfter',poolInfoAfterBalance.poolValue.toString(),poolInfoAfterBalance.vcashDebt.toString(),poolInfoAfterBalance.vcashCredit.toString(),poolInfoAfterBalance.tokenBalanceVcashValue.toString());
 
         const poolPriceAfterRebalancing = ((await this.pool.pools(this.aave.address)).price).toString();
 
@@ -677,7 +677,7 @@ describe('MonoX Core', function () {
 
         console.log('tokens received by owner',aliceBalanceAfterRebalancing-aliceBalanceBeforeRebalancing);
 
-        expect(poolInfoAfterBalance.vusdDebt.toNumber()).to.lessThan(1000); //we expect the new debt to be close to 0
+        expect(poolInfoAfterBalance.vcashDebt.toNumber()).to.lessThan(1000); //we expect the new debt to be close to 0
 
         expect(poolPriceAfterRebalancing).to.equal(poolPriceBeforeRebalancing);
 
@@ -802,7 +802,7 @@ describe('MonoX Core', function () {
         let infoAfter=await this.pool.pools(this.weth.address);
         let feeToBalanceAfter = await this.weth.balanceOf(feeTo);
         
-        expect(parseInt(infoAfter.vusdDebt)).to.lessThan(10000);  // we expect vusdDebt to still be near0 because of internal rebalancing for official pools
+        expect(parseInt(infoAfter.vcashDebt)).to.lessThan(10000);  // we expect vcashDebt to still be near0 because of internal rebalancing for official pools
         expect(parseInt(feeToBalanceAfter)).to.greaterThan(0); //we expect the feeTo address to contain the tokens resulted from internal rebalancing
      
     });
