@@ -39,7 +39,7 @@ async function main() {
   }
   const vcash = await VCASH.deploy()
   console.log("VCASH address:", vcash.address)
-  const monoXPool = await MonoXPool.deploy(WETH)
+  const monoXPool = await upgrades.deployProxy(MonoXPool, [WETH])
   console.log("MonoXPool address:", monoXPool.address)
   const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vcash.address])
   console.log("Monoswap address:", monoswap.address)
