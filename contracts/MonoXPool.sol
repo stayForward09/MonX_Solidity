@@ -74,7 +74,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
         virtual
         override
     {
-      if (!whitelist[to]) {
+      if (!whitelist[from] && !whitelist[to]) {
         require(!isUnofficial[id] || from != topHolder[id] || createdAt[id] + 90 days <= block.timestamp, "MonoXPool:TOP HOLDER");
         if (isUnofficial[id])
           require(liquidityLastAdded[id][from] + 24 hours <= block.timestamp, "MonoXPool:WRONG_TIME");
@@ -121,7 +121,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     }
 
     function _trackTopHolder(uint256 id, address account) internal {
-      if (isUnofficial[id] || createdAt[id] + 90 days > block.timestamp) {
+      if (!whitelist[account] && (isUnofficial[id] || createdAt[id] + 90 days > block.timestamp)) {
         uint256 liquidityAmount = balanceOf(account, id);
         uint256 topHolderAmount = topHolder[id] != address(0) ? balanceOf(topHolder[id], id) : 0;
         if (liquidityAmount > topHolderAmount) {
