@@ -60,7 +60,8 @@ async function main() {
   })
 
   const oz_monoswap = require("../.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
-  const monoxpoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
+  const implsLen = Object.keys(oz_monoswap.impls).length;
+  const monoxpoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 2]].address
   console.log("MonoXPool Impl Address", monoxpoolImplAddress)
   try {
     await hre.run("verify:verify", {
@@ -72,7 +73,7 @@ async function main() {
     console.log(e)
   }
 
-  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[1]].address
+  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 1]].address
   console.log("Monoswap Impl Address", monoswapImplAddress)
   try {
     await hre.run("verify:verify", {
