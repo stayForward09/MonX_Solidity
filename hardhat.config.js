@@ -97,7 +97,8 @@ task("upgrade-monoxpool", "Upgrade MonoXPool contract")
   await monoXPool.deployed()
   
   const oz_monoswap = require("./.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
-  const monoXPoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[0]].address
+  const implsLen = Object.keys(oz_monoswap.impls).length;
+  const monoXPoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen-1]].address
   console.log("MonoXPool Impl Address", monoXPoolImplAddress)
   try {
     await hre.run("verify:verify", {
@@ -137,7 +138,8 @@ task("upgrade-monoswap", "Upgrade Monoswap contract")
   await monoswap.deployed()
   
   const oz_monoswap = require("./.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
-  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[1]].address
+  const implsLen = Object.keys(oz_monoswap.impls).length;
+  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 1]].address
   console.log("Monoswap Impl Address", monoswapImplAddress)
   try {
     await hre.run("verify:verify", {
