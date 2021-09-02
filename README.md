@@ -2,6 +2,7 @@
 
 ## How to list new token?
 
+
 > Listing new token requires that the token has been approved in advance.
 > User can list token using `listNewToken` function
 
@@ -27,6 +28,7 @@ to: Address that gets liquidity
 
 > This function list tokens and add liquidity with vcashAmount and tokenAmount and send LP token to `to`
 ## How to add liquidity?
+
 > Adding liquidity requires that the token has been approved in advance.
 > User can add liquidity using `addLiquidity` function.
 
