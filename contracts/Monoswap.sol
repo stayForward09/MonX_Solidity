@@ -24,6 +24,7 @@ interface IvCash is IERC20 {
  */
 contract Monoswap is Initializable, OwnableUpgradeable {
   using SafeMath for uint256;
+  using SafeMath for uint112;
   using SafeERC20 for IERC20;
   using SafeERC20 for IvCash;
 
@@ -263,8 +264,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   function _internalRebalance(address _token) internal {
     uint poolPrice = pools[_token].price;
     uint vcashIn = pools[_token].vcashDebt;
-    if(pools[_token].tokenBalance * poolPrice / 1e18 < vcashIn){
-      vcashIn = pools[_token].tokenBalance * poolPrice / 1e18;
+    if(poolPrice.mul(pools[_token].tokenBalance) / 1e18 < vcashIn){
+      vcashIn = poolPrice.mul(pools[_token].tokenBalance) / 1e18;
     }
 
     if(tokenStatus[_token]==2){
@@ -275,7 +276,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       uint256 balanceIn1 = IERC20(_token).balanceOf(address(monoXPool));
       uint realAmount = balanceIn0.sub(balanceIn1);
 
-      vcashIn = (realAmount * poolPrice).div(1e18);
+      vcashIn = realAmount.mul(poolPrice) / 1e18;
     }
     
     _syncPoolInfo(_token, vcashIn, 0);
