@@ -242,6 +242,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   function setSynthPoolPrice(address _token, uint price) external onlyPriceAdjuster {
     require(pools[_token].status==PoolStatus.SYNTHETIC,"MonoX:NOT_SYNT");
+    require(price > 0, "MonoX:ZERO_PRICE");
     pools[_token].price=price;
     emit SyntheticPoolPriceChanged(_token,price);
   }
