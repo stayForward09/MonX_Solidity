@@ -48,7 +48,7 @@ async function main() {
   await monoXPool.deployed()
   await monoswap.deployed()
 
-  await vcash.transferOwnership(monoswap.address)
+  await vcash.setMinter(monoswap.address)
   await monoXPool.setAdmin(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
   await monoswap.setFeeTo(deployer.address)
