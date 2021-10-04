@@ -28,6 +28,9 @@ async function main() {
     case 4: // rinkeby
       WETH = '0xc778417e063141139fce010982780140aa0cd5ab'
       break
+    case 5: // goerli
+      WETH = '0xb4fbf271143f4fbf7b91a5ded31805e42b2208d6'
+      break
     case 137: // polygon
       WETH = '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270'
       break
