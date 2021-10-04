@@ -66,7 +66,7 @@ describe('MonoX Core', function () {
         await this.comp.transfer(this.bob.address, bigNum(10000000))  
         this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vcash.address],{unsafeAllowLinkedLibraries:true})
-        this.vcash.transferOwnership(this.pool.address)
+        this.vcash.setMinter(this.pool.address)
         this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.pool.setFeeTo(this.dev.address)
