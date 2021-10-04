@@ -154,6 +154,33 @@ task("upgrade-monoswap", "Upgrade Monoswap contract")
   console.log("success");
 })
 
+task("update-childchainmanager", "Deploy MonoswapStaking")
+  .addParam("vcash", "vCASH token")
+  .addParam("childchainmanager", "Child Chain Proxy Manager")
+  .setAction(async (args) => {
+
+  const [deployer] = await ethers.getSigners();
+
+  if(!(ethers.utils.isAddress(args.vcash)) || !(ethers.utils.isAddress(args.childchainmanager))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  );
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  
+  const vCASH = await ethers.getContractFactory("vCASH");
+  const vcash = await vCASH.attach(args.vcash);
+  
+  await vcash.updateChildChainManager(args.childchainmanager)
+  
+  console.log("success");
+})
+
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
