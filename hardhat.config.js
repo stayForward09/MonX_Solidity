@@ -72,6 +72,31 @@ task("set-whitelist", "Sets whitelist")
   console.log("success");
 })
 
+task("set-uri", "Sets URI")
+  .addParam("monoxpool", "MonoXPool's address")
+  .addParam("uri", "URI, Ex: https://token-cdn-domain/\{id\}.json")
+  .setAction(async (args) => {
+  
+  if(!(ethers.utils.isAddress(args.monoxpool))){
+    console.log(args)
+    throw new Error("bad args");
+  }
+  const [deployer] = await ethers.getSigners();
+
+  console.log(
+    "Deploying contracts with the account:",
+    deployer.address
+  );
+  
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+  
+  const MonoXPool = await ethers.getContractFactory("MonoXPool")
+  const monoXPool = await MonoXPool.attach(args.monoxpool);
+  await monoXPool.setURI(args.uri)
+
+  console.log("success");
+})
+
 task("upgrade-monoxpool", "Upgrade MonoXPool contract")
   .addParam("monoxpool", "MonoXPool's address")
   .setAction(async (args) => {

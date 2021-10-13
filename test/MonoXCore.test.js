@@ -125,6 +125,11 @@ describe('MonoX Core', function () {
     //     expect(config._devFee).to.equal(50)
     // });
 
+    it('should set uri successfully', async function () {
+        await this.monoXPool.connect(this.minter).setURI("https://token-cdn-domain/\{id\}.json")
+        expect(await this.monoXPool.uri(0)).to.equal("https://token-cdn-domain/\{id\}.json")
+    });
+
     it('should add liquidity successfully', async function () {
         let ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
