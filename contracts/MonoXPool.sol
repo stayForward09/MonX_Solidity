@@ -39,6 +39,20 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     }
     receive() external payable {
     }
+    /**
+     * @dev Sets a new URI for all token types, by relying on the token type ID
+     * substitution mechanism
+     * https://eips.ethereum.org/EIPS/eip-1155#metadata[defined in the EIP].
+     *
+     * For example, the `https://token-cdn-domain/\{id\}.json` URI would be
+     * interpreted by clients as
+     * `https://token-cdn-domain/000000000000000000000000000000000000000000000000000000000004cce0.json`
+     * for token type ID 0x4cce0.
+     
+     */
+    function setURI(string memory uri) external onlyAdmin {
+      _setURI(uri);
+    }
 
     function mintLp(address account, uint256 id, uint256 amount, bool _isUnofficial) public onlyOwner {
       if (createdAt[id] == 0) 
