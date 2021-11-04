@@ -37,6 +37,9 @@ async function main() {
     case 80001: // mumbai
       WETH = '0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889'
       break
+    case 43113: // fuji
+      WETH = '0xd00ae08403B9bbb9124bB305C09058E32C39A48c'
+      break
     default:
       throw new Error("unknown network");
   }
@@ -56,16 +59,23 @@ async function main() {
   await monoXPool.transferOwnership(monoswap.address)
   await monoswap.setFeeTo(deployer.address)
   
+  
+  const oz_monoswap = require("../.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
+  const implsLen = Object.keys(oz_monoswap.impls).length;
+  const monoxpoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 2]].address
+  console.log("MonoXPool Impl Address", monoxpoolImplAddress)
+
+  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 1]].address
+  console.log("Monoswap Impl Address", monoswapImplAddress)
+
+  if (network.chainId == 43113) return
+  
   await hre.run("verify:verify", {
     address: vcash.address,
     constructorArguments: [
     ],
   })
-
-  const oz_monoswap = require("../.openzeppelin/" + (network.name === "unknown" ? network.name + "-" + network.chainId : network.name) + ".json")
-  const implsLen = Object.keys(oz_monoswap.impls).length;
-  const monoxpoolImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 2]].address
-  console.log("MonoXPool Impl Address", monoxpoolImplAddress)
+  
   try {
     await hre.run("verify:verify", {
       address: monoxpoolImplAddress,
@@ -75,9 +85,7 @@ async function main() {
   } catch (e) {
     console.log(e)
   }
-
-  const monoswapImplAddress = oz_monoswap.impls[Object.keys(oz_monoswap.impls)[implsLen - 1]].address
-  console.log("Monoswap Impl Address", monoswapImplAddress)
+  
   try {
     await hre.run("verify:verify", {
       address: monoswapImplAddress,

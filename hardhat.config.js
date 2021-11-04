@@ -255,6 +255,10 @@ module.exports = {
     matic: {
       url: "https://rpc-mainnet.matic.network",
       accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    fuji: {
+      url: "https://api.avax-test.network/ext/bc/C/rpc",
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
     }
   },
   etherscan: {
