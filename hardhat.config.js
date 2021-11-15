@@ -258,6 +258,7 @@ module.exports = {
     },
     fuji: {
       url: "https://api.avax-test.network/ext/bc/C/rpc",
+      chainId: 43113,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     }
   },
