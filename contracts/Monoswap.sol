@@ -321,8 +321,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // safe ops, since newPoolValue>lastPoolValue
       uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
       // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
-      uint256 devLiquidity = monoXPool.totalSupplyOf(pid).mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      monoXPool.mint(feeTo, pid, devLiquidity);
+      // uint256 devLiquidity = monoXPool.totalSupplyOf(pid).mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
+      
+      uint numerator = monoXPool.totalSupplyOf(pid).mul(newPoolValue.sub(lastPoolValue));
+      uint denominator = newPoolValue.mul(uint(1e5).div(devFee).sub(1)).add(lastPoolValue);
+      uint devLiquidity = numerator / denominator;
+      if (devLiquidity > 0) monoXPool.mint(feeTo, pid, devLiquidity);
+      
     }
     
   }
