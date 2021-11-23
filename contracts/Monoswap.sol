@@ -326,7 +326,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       // using equation (5) on https://uniswap.org/whitepaper.pdf
       uint deltaFi = deltaPoolValue.mul(devFee)/1e5;
       uint numerator = monoXPool.totalSupplyOf(pid).mul(deltaFi);
-      uint denominator = newPoolValue.sub(deltaPoolValue).sub(deltaFi);
+      uint denominator = newPoolValue.sub(deltaFi);
       uint devLiquidity = numerator / denominator;
       if (devLiquidity > 0) monoXPool.mint(feeTo, pid, devLiquidity);
       
