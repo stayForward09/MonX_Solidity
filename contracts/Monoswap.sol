@@ -316,21 +316,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // internal func to pay contract owner
   function _mintFee (uint256 pid, uint256 lastPoolValue, uint256 newPoolValue) internal {
     
-    // uint256 _totalSupply = monoXPool.totalSupplyOf(pid);
-    if(newPoolValue>lastPoolValue && lastPoolValue>0) {
-      // safe ops, since newPoolValue>lastPoolValue
-      uint256 deltaPoolValue = newPoolValue - lastPoolValue; 
-      // safe ops, since newPoolValue = deltaPoolValue + lastPoolValue > deltaPoolValue
-      // uint256 devLiquidity = monoXPool.totalSupplyOf(pid).mul(deltaPoolValue).mul(devFee).div(newPoolValue-deltaPoolValue)/1e5;
-      
-      // using equation (5) on https://uniswap.org/whitepaper.pdf
-      uint deltaFi = deltaPoolValue.mul(devFee)/1e5;
-      uint numerator = monoXPool.totalSupplyOf(pid).mul(deltaFi);
-      uint denominator = newPoolValue.sub(deltaFi);
-      uint devLiquidity = numerator / denominator;
-      if (devLiquidity > 0) monoXPool.mint(feeTo, pid, devLiquidity);
-      
-    }
+    // dropping tx fees for now
+    return;
     
   }
 

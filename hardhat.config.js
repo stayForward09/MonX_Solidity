@@ -253,7 +253,7 @@ module.exports = {
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     matic: {
-      url: "https://rpc-mainnet.matic.network",
+      url: "https://nd-484-955-811.p2pify.com/32d6df71df6498ecd235a9358e5cb831",
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     fuji: {
