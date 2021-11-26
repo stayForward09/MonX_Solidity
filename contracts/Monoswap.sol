@@ -62,6 +62,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   mapping (address => PoolInfo) public pools;
+  mapping (address => uint256) public unassessedFees;
   // tokenStatus is for token lock/transfer. exempt means no need to verify post tx
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
 
@@ -314,11 +315,18 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
 
   // internal func to pay contract owner
-  function _mintFee (uint256 pid, uint256 lastPoolValue, uint256 newPoolValue) internal {
-    
-    // dropping tx fees for now
-    return;
-    
+  function _mintFee (uint256 pid, address _token, uint256 newPoolValue) internal {
+    uint256 deltaPoolValue = unassessedFees[_token];
+    uint deltaFi = deltaPoolValue.mul(devFee)/1e5;
+    uint numerator = monoXPool.totalSupplyOf(pid).mul(deltaFi);
+    if (newPoolValue > deltaPoolValue.add(deltaFi)) {
+      uint denominator = newPoolValue.sub(deltaPoolValue).sub(deltaFi);
+      uint devLiquidity = numerator / denominator;
+      if (devLiquidity > 0) {
+        monoXPool.mint(feeTo, pid, devLiquidity);
+        unassessedFees[_token] = 0;
+      }
+    }
   }
 
   // util func to get some basic pool info
@@ -367,7 +375,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     poolValue = poolValue.add(pool.vcashCredit).sub(pool.vcashDebt);
 
     
-    _mintFee(pool.pid, pool.lastPoolValue, poolValue);
+    _mintFee(pool.pid, pool.token, poolValue);
 
     tokenAmount = transferAndCheck(from,address(monoXPoolLocal),_token,tokenAmount);
 
@@ -484,7 +492,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 poolValue;
     uint256 liquidityIn;
     (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(_token, liquidity, to);
-    _mintFee(pool.pid, pool.lastPoolValue, poolValue);
+    _mintFee(pool.pid, pool.token, poolValue);
     require (vcashOut>=minVcashOut, "MonoX:INSUFF_vCash");
     require (tokenOut>=minTokenOut, "MonoX:INSUFF_TOKEN");
 
@@ -818,7 +826,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tradeVcashValue;
     
     (tokenInPrice, tokenOutPrice, amountOut, tradeVcashValue) = getAmountOut(tokenIn, tokenOut, amountIn);
-
+    
     uint256 oneSideFeesInVcash = tokenInPrice.mul(amountIn.mul(fees)/2e5)/1e18;
 
     // trading in
@@ -840,6 +848,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVcashValue.add(oneSideFeesInVcash), 0, 
         to == monoXPoolLocal ? amountOut : 0);
     }
+    
+    unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
 
     if(pools[tokenIn].vcashDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
       _internalRebalance(tokenIn);
@@ -893,6 +903,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       _internalRebalance(tokenIn);
     }
   
+    unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVcashValue);
 
