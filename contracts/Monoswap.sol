@@ -62,7 +62,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   mapping (address => PoolInfo) public pools;
-  mapping (address => uint256) public unassessedFees;
+  
   // tokenStatus is for token lock/transfer. exempt means no need to verify post tx
   mapping (address => uint8) private tokenStatus; //0=unlocked, 1=locked, 2=exempt
 
@@ -156,7 +156,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // ------------
   uint public poolSizeMinLimit;
-
+  mapping (address => uint256) public unassessedFees;
 
   function initialize(IMonoXPool _monoXPool, IvCash _vcash) public initializer {
     OwnableUpgradeable.__Ownable_init();
