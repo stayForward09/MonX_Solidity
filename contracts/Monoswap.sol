@@ -836,6 +836,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       oneSideFeesInVcash = oneSideFeesInVcash.mul(2);
     }else{
       _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVcashValue.add(oneSideFeesInVcash), 0);
+      unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
     }
 
     // trading out
@@ -847,10 +848,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       }
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVcashValue.add(oneSideFeesInVcash), 0, 
         to == monoXPoolLocal ? amountOut : 0);
+      unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
     }
-    
-    if(!(tokenIn==address(vCash) || tokenOut==address(vCash)))
-      unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
 
     if(pools[tokenIn].vcashDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
       _internalRebalance(tokenIn);
@@ -884,6 +883,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       oneSideFeesInVcash = oneSideFeesInVcash.mul(2);
     }else {
       _updateTokenInfo(tokenIn, tokenInPrice, 0, tradeVcashValue.add(oneSideFeesInVcash), 0);
+      unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
     }
 
     // trading out
@@ -897,15 +897,12 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       }
       _updateTokenInfo(tokenOut, tokenOutPrice, tradeVcashValue.add(oneSideFeesInVcash), 0, 
         to == monoXPoolLocal ? amountOut:0 );
+      unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
     }
-
      
     if(pools[tokenIn].vcashDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
       _internalRebalance(tokenIn);
     }
-
-    if(!(tokenIn==address(vCash) || tokenOut==address(vCash)))
-      unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVcashValue);
 
