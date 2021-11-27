@@ -849,7 +849,8 @@ contract Monoswap is Initializable, OwnableUpgradeable {
         to == monoXPoolLocal ? amountOut : 0);
     }
     
-    unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
+    if(!(tokenIn==address(vCash) || tokenOut==address(vCash)))
+      unassessedFees[tokenIn] = oneSideFeesInVcash.add(unassessedFees[tokenIn]);
 
     if(pools[tokenIn].vcashDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
       _internalRebalance(tokenIn);
@@ -902,8 +903,9 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     if(pools[tokenIn].vcashDebt > 0 && pools[tokenIn].status == PoolStatus.OFFICIAL){
       _internalRebalance(tokenIn);
     }
-  
-    unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
+
+    if(!(tokenIn==address(vCash) || tokenOut==address(vCash)))
+      unassessedFees[tokenOut] = oneSideFeesInVcash.add(unassessedFees[tokenOut]);
 
     emit Swap(to, tokenIn, tokenOut, amountIn, amountOut, tradeVcashValue);
 
