@@ -20,7 +20,7 @@ interface IvCash is IERC20 {
 
 
 /**
- * The Monoswap is ERC1155 contract does this and that...
+ * The MonoswapCore is ERC1155 contract does this and that...
  */
 contract Monoswap is Initializable, OwnableUpgradeable {
   using SafeMath for uint256;
@@ -29,10 +29,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   using SafeERC20 for IvCash;
 
   IvCash vCash;
-  address WETH;
-  address feeTo;
-  uint16 fees; // over 1e5, 300 means 0.3%
-  uint16 devFee; // over 1e5, 50 means 0.05%
+  address public router;
+  address public WETH;
+  address public feeTo;
+  uint16 public fees; // over 1e5, 300 means 0.3%
+  uint16 public devFee; // over 1e5, 50 means 0.05%
 
   uint256 constant MINIMUM_LIQUIDITY=100;
   
@@ -104,6 +105,11 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     _;
   }
 
+  modifier onlyRouter() {
+    require(router == msg.sender, 'MonoX:NOT_ROUTER');
+    _;
+  }
+
   event AddLiquidity(address indexed provider, 
     uint indexed pid,
     address indexed token,
@@ -172,6 +178,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // receive() external payable {
   //   assert(msg.sender == WETH); // only accept ETH via fallback from the WETH contract
   // }
+
+  function setRouter (address _router) onlyOwner external {
+    router = _router;
+  }
 
   function setFeeTo (address _feeTo) onlyOwner external {
     feeTo = _feeTo;
@@ -346,19 +356,21 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 tokenAmount,
     address to) external returns(uint _pid, uint256 liquidity) {
     _pid = _createPool(_token, _price, PoolStatus.LISTED);
-    liquidity = _addLiquidityPair(_token, vcashAmount, tokenAmount, msg.sender, to);
+    liquidity = _addLiquidityPair(msg.sender, _token, vcashAmount, tokenAmount, msg.sender, to);
+  }
+
+  function addLiquidityPair (address user,
+    address _token, 
+    uint256 vcashAmount, 
+    uint256 tokenAmount,
+    address from,
+    address to) external onlyRouter returns(uint256 liquidity) {
+    liquidity = _addLiquidityPair (user, _token, vcashAmount, tokenAmount, from, to);
   }
 
   // add liquidity pair to a pool. allows adding vcash.
-  function addLiquidityPair (address _token, 
-    uint256 vcashAmount, 
-    uint256 tokenAmount,
-    address to) external returns(uint256 liquidity) {
-    liquidity = _addLiquidityPair(_token, vcashAmount, tokenAmount, msg.sender, to);
-  }
-
-    // add liquidity pair to a pool. allows adding vcash.
-  function _addLiquidityPair (address _token, 
+  function _addLiquidityPair (address user,
+    address _token, 
     uint256 vcashAmount, 
     uint256 tokenAmount,
     address from,
@@ -380,7 +392,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     tokenAmount = transferAndCheck(from,address(monoXPoolLocal),_token,tokenAmount);
 
     if(vcashAmount>0){
-      vCash.safeTransferFrom(msg.sender, address(monoXPoolLocal), vcashAmount);
+      vCash.safeTransferFrom(user, address(monoXPoolLocal), vcashAmount);
       vCash.burn(address(monoXPool), vcashAmount);
     }
 
@@ -408,18 +420,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     liquidity, 
     vcashAmount, tokenAmount, pool.price);
   }
-  
-  // add one-sided liquidity to a pool. no vcash
-  function addLiquidity (address _token, uint256 _amount, address to) external returns(uint256 liquidity)  {
-    liquidity = _addLiquidityPair(_token, 0, _amount, msg.sender, to);
-  }  
-
-  // add one-sided ETH liquidity to a pool. no vcash
-  function addLiquidityETH (address to) external payable returns(uint256 liquidity)  {
-    MonoXLibrary.safeTransferETH(address(monoXPool), msg.value);
-    monoXPool.depositWETH(msg.value);
-    liquidity = _addLiquidityPair(WETH, 0, msg.value, address(this), to);
-  }  
 
   // updates pool vcash balance, token balance and last pool value.
   // this function requires others to do the input validation
@@ -438,7 +438,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   // view func for removing liquidity
-  function _removeLiquidity (address _token, uint256 liquidity,
+  function _removeLiquidity (address user, address _token, uint256 liquidity,
     address to) view public returns(
     uint256 poolValue, uint256 liquidityIn, uint256 vcashOut, uint256 tokenOut) {
     
@@ -447,12 +447,13 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     uint256 vcashCredit;
     uint256 vcashDebt;
     PoolInfo memory pool = pools[_token];
-    IMonoXPool monoXPoolLocal = monoXPool;
-    uint256 lastAdded = monoXPoolLocal.liquidityLastAddedOf(pool.pid, msg.sender);
-    
-    require((lastAdded + (pool.status == PoolStatus.OFFICIAL ? 4 hours : pool.status == PoolStatus.LISTED ? 24 hours : 0)) <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
-    address topLPHolder = monoXPoolLocal.topLPHolderOf(pool.pid);
-    require(pool.status != PoolStatus.LISTED || msg.sender != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
+    uint256 lastAdded = monoXPool.liquidityLastAddedOf(pool.pid, user);
+    uint256 lockTime;
+    if (pool.status == PoolStatus.OFFICIAL) lockTime = 4 hours;
+    else if (pool.status == PoolStatus.LISTED) lockTime = 24 hours;
+    require(lastAdded + lockTime <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
+    address topLPHolder = monoXPool.topLPHolderOf(pool.pid);
+    require(pool.status != PoolStatus.LISTED || user != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
 
     (poolValue, tokenBalanceVcashValue, vcashCredit, vcashDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
@@ -474,24 +475,17 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     tokenOut = liquidityIn.mul(tokenReserve).div(_totalSupply);
 
   }
-  
-  // actually removes liquidity
-  function removeLiquidity (address _token, uint256 liquidity, address to, 
-    uint256 minVcashOut, 
-    uint256 minTokenOut) external returns(uint256 vcashOut, uint256 tokenOut)  {
-    (vcashOut, tokenOut) = _removeLiquidityHelper (_token, liquidity, to, minVcashOut, minTokenOut, false);
-  }
 
   // actually removes liquidity
-  function _removeLiquidityHelper (address _token, uint256 liquidity, address to, 
+  function removeLiquidityHelper (address user, address _token, uint256 liquidity, address to, 
     uint256 minVcashOut, 
     uint256 minTokenOut,
-    bool isETH) lockToken(_token) internal returns(uint256 vcashOut, uint256 tokenOut)  {
+    bool isETH) onlyRouter lockToken(_token) external returns(uint256 vcashOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "MonoX:NO_TOKEN");
     PoolInfo memory pool = pools[_token];
     uint256 poolValue;
     uint256 liquidityIn;
-    (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(_token, liquidity, to);
+    (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(user, _token, liquidity, to);
     _mintFee(pool.pid, pool.token, poolValue);
     require (vcashOut>=minVcashOut, "MonoX:INSUFF_vCash");
     require (tokenOut>=minTokenOut, "MonoX:INSUFF_TOKEN");
@@ -517,14 +511,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       vcashOut, tokenOut, pool.price);
   }
 
-  // actually removes ETH liquidity
-  function removeLiquidityETH (uint256 liquidity, address to, 
-    uint256 minVcashOut, 
-    uint256 minTokenOut) external returns(uint256 vcashOut, uint256 tokenOut)  {
-
-    (vcashOut, tokenOut) = _removeLiquidityHelper (WETH, liquidity, to, minVcashOut, minTokenOut, true);
-  }
-
   // util func to compute new price
   function _getNewPrice (uint256 originalPrice, uint256 reserve, 
     uint256 delta, uint256 deltaBlocks, TxType txType) pure internal returns(uint256 price) {
@@ -539,92 +525,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // util func to compute new price
   function _getAvgPrice (uint256 originalPrice, uint256 newPrice) pure internal returns(uint256 price) {
     price = originalPrice.add(newPrice.mul(4))/5;
-  }
-
-  // standard swap interface implementing uniswap router V2
-  
-  function swapExactETHForToken(
-    address tokenOut,
-    uint amountOutMin,
-    address to,
-    uint deadline
-  ) external virtual payable ensure(deadline) returns (uint amountOut) {
-    uint amountIn = msg.value;
-    MonoXLibrary.safeTransferETH(address(monoXPool), amountIn);
-    monoXPool.depositWETH(amountIn);
-    amountOut = swapIn(WETH, tokenOut, address(this), to, amountIn);
-    require(amountOut >= amountOutMin, 'MonoX:INSUFF_OUTPUT');
-  }
-  
-  function swapExactTokenForETH(
-    address tokenIn,
-    uint amountIn,
-    uint amountOutMin,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountOut) {
-    IMonoXPool monoXPoolLocal = monoXPool;
-    amountOut = swapIn(tokenIn, WETH, msg.sender, address(monoXPoolLocal), amountIn);
-    require(amountOut >= amountOutMin, 'MonoX:INSUFF_OUTPUT');
-    monoXPoolLocal.withdrawWETH(amountOut);
-    monoXPoolLocal.safeTransferETH(to, amountOut);
-  }
-
-  function swapETHForExactToken(
-    address tokenOut,
-    uint amountInMax,
-    uint amountOut,
-    address to,
-    uint deadline
-  ) external virtual payable ensure(deadline) returns (uint amountIn) {
-    uint amountSentIn = msg.value;
-    ( , , amountIn, ) = getAmountIn(WETH, tokenOut, amountOut);
-    MonoXLibrary.safeTransferETH(address(monoXPool), amountIn);
-    monoXPool.depositWETH(amountIn);
-    amountIn = swapOut(WETH, tokenOut, address(this), to, amountOut);
-    require(amountIn <= amountSentIn, 'MonoX:BAD_INPUT');
-    require(amountIn <= amountInMax, 'MonoX:EXCESSIVE_INPUT');
-    if (amountSentIn > amountIn) {
-      MonoXLibrary.safeTransferETH(msg.sender, amountSentIn.sub(amountIn));
-    }
-  }
-
-  function swapTokenForExactETH(
-    address tokenIn,
-    uint amountInMax,
-    uint amountOut,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountIn) {
-    IMonoXPool monoXPoolLocal = monoXPool;
-    amountIn = swapOut(tokenIn, WETH, msg.sender, address(monoXPoolLocal), amountOut);
-    require(amountIn <= amountInMax, 'MonoX:EXCESSIVE_INPUT');
-    monoXPoolLocal.withdrawWETH(amountOut);
-    monoXPoolLocal.safeTransferETH(to, amountOut);
-  }
-
-  function swapExactTokenForToken(
-    address tokenIn,
-    address tokenOut,
-    uint amountIn,
-    uint amountOutMin,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountOut) {
-    amountOut = swapIn(tokenIn, tokenOut, msg.sender, to, amountIn);
-    require(amountOut >= amountOutMin, 'MonoX:INSUFF_OUTPUT');
-  }
-
-  function swapTokenForExactToken(
-    address tokenIn,
-    address tokenOut,
-    uint amountInMax,
-    uint amountOut,
-    address to,
-    uint deadline
-  ) external virtual ensure(deadline) returns (uint amountIn) {
-    amountIn = swapOut(tokenIn, tokenOut, msg.sender, to, amountOut);
-    require(amountIn <= amountInMax, 'MonoX:EXCESSIVE_INPUT');
   }
 
   // util func to manipulate vcash balance
@@ -813,7 +713,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
   // swap from tokenIn to tokenOut with fixed tokenIn amount.
   function swapIn (address tokenIn, address tokenOut, address from, address to,
-      uint256 amountIn) internal lockToken(tokenIn) returns(uint256 amountOut)  {
+      uint256 amountIn) public onlyRouter lockToken(tokenIn) lock returns(uint256 amountOut)  {
 
     address monoXPoolLocal = address(monoXPool);
 
@@ -862,7 +762,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   
   // swap from tokenIn to tokenOut with fixed tokenOut amount.
   function swapOut (address tokenIn, address tokenOut, address from, address to, 
-      uint256 amountOut) internal lockToken(tokenIn) returns(uint256 amountIn)  {
+      uint256 amountOut) public onlyRouter lockToken(tokenIn) lock returns(uint256 amountIn)  {
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
     uint256 tradeVcashValue;
