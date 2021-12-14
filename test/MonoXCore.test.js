@@ -120,13 +120,13 @@ describe('MonoX Core', function () {
             bigNum(1000000), this.alice.address);
     })
 
-    // it("should set correct state variables", async function () {
-    //     const config = await this.pool.getConfig()
-    //     expect(config._vCASH).to.equal(this.vcash.address)
-    //     expect(config._feeTo).to.equal(this.dev.address)
-    //     expect(config._fees).to.equal(300)
-    //     expect(config._devFee).to.equal(50)
-    // });
+    it("should set correct state variables", async function () {
+        const config = await this.pool.getConfig()
+        expect(config._vCash).to.equal(this.vcash.address)
+        expect(config._feeTo).to.equal(this.dev.address)
+        expect(config._fees).to.equal(300)
+        expect(config._devFee).to.equal(50)
+    });
 
     it('should set uri successfully', async function () {
         await this.monoXPool.connect(this.minter).setURI("https://token-cdn-domain/\{id\}.json")
@@ -182,7 +182,7 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - 2', async function () {
 
         const deadline = (await time.latest()) + 10000
-
+        this.pool.setTokenStatus(this.uni.address, 2)
         await this.router.connect(this.bob).swapExactTokenForToken(
             this.uni.address, this.dai.address, 
             bigNum(2), bigNum(55), this.bob.address, deadline)
@@ -232,6 +232,37 @@ describe('MonoX Core', function () {
 
         expect(vcashbob0-vcashbob1).to.greaterThan(300)
         expect(vcashbob0-vcashbob1).to.lessThan(302)
+
+        uniPool = await this.pool.pools(this.uni.address)
+        const uniPrice1 = smallNum(uniPool.price.toString())
+        expect(uniPrice0).to.lessThan(uniPrice1)
+    });
+
+    it('should purchase and sell vCASH successfully - 2', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.router.connect(this.bob).swapTokenForExactToken(
+            this.uni.address, this.vcash.address, 
+            bigNum(20), bigNum(400),  this.bob.address, deadline)
+
+        let vcashbob0 = smallNum((await this.vcash.balanceOf(this.bob.address)).toString())
+
+        expect(vcashbob0).to.equal(400)
+        
+        let uniPool = await this.pool.pools(this.uni.address)
+        let uniPrice0 = smallNum(uniPool.price.toString())
+
+        expect(uniPrice0).to.greaterThan(20)
+        expect(uniPrice0).to.lessThan(30)
+
+        await this.router.connect(this.bob).swapExactTokenForToken(
+            this.vcash.address, this.uni.address, 
+            bigNum(350), bigNum(10),  this.bob.address, deadline)
+
+        let vcashbob1 = smallNum((await this.vcash.balanceOf( this.bob.address)).toString())
+
+        expect(vcashbob0-vcashbob1).to.equal(350)
 
         uniPool = await this.pool.pools(this.uni.address)
         const uniPrice1 = smallNum(uniPool.price.toString())
@@ -404,7 +435,7 @@ describe('MonoX Core', function () {
         const daiPool = await this.pool.pools(this.dai.address);
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(250)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
-        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(0.99)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
         expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000)       //internal rebalancing happens
         expect(smallNum(await wethAmount.toString())).to.lessThan(1000000.002)
@@ -541,7 +572,7 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-610)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1.9)
-        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThanOrEqual(2)
         expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 2)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
@@ -565,7 +596,7 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-305)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-300)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(0.9)
-        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(1)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThanOrEqual(1)
         expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 1)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
