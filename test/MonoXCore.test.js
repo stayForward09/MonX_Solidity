@@ -69,6 +69,7 @@ describe('MonoX Core', function () {
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vcash.address],{unsafeAllowLinkedLibraries:true})
         this.router = await this.MonoswapRouter.deploy(this.pool.address)
         this.vcash.setMinter(this.pool.address)
+        this.vcash.setMinter(this.minter.address)
         this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
         this.monoXPool.connect(this.minter).setRouter(this.router.address)
@@ -906,5 +907,29 @@ describe('MonoX Core', function () {
         expect(await this.monoXPool.admin()).to.equal(this.minter.address)
         await this.monoXPool.connect(this.minter).setAdmin(this.alice.address)
         expect(await this.monoXPool.admin()).to.equal(this.alice.address)
+    });
+
+    it('should add and remove liquidity successfully - 2', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.vcash.connect(this.minter).mint(this.bob.address, bigNum(1000000))
+
+        await this.router.connect(this.bob).addLiquidityPair(this.uni.address, 
+            bigNum(1000000), bigNum(1000000),  this.bob.address);
+        console.log(await this.vcash.balanceOf(this.alice.address))
+        const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
+        console.log('liquidity', liquidity);
+        await time.increase(60 * 60 * 24)
+        const results = await this.router.connect(this.bob).removeLiquidity(
+            this.uni.address, liquidity, this.alice.address, 0, 0);
+
+        let vcashAmount = await this.vcash.balanceOf(this.alice.address)
+
+        expect(smallNum(vcashAmount.toString())).to.greaterThan(490000)
+        expect(smallNum(vcashAmount.toString())).to.lessThan(500000)
+
+        let devFee = await this.vcash.balanceOf(this.dev.address)
+        console.log(smallNum(devFee.toString()))
     });
 });
