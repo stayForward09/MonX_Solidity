@@ -129,6 +129,16 @@ describe('MonoX Core', function () {
         expect(config._devFee).to.equal(50)
     });
 
+    it("should set fees", async function () {
+        await expect(this.pool.setFees(1000)).to.be.revertedWith("")
+        this.pool.setFees(300)
+    });
+
+    it("should set dev fee", async function () {
+        await expect(this.pool.setDevFee(1000)).to.be.revertedWith("")
+        this.pool.setDevFee(50)
+    });
+
     it('should set uri successfully', async function () {
         await this.monoXPool.connect(this.minter).setURI("https://token-cdn-domain/\{id\}.json")
         expect(await this.monoXPool.uri(0)).to.equal("https://token-cdn-domain/\{id\}.json")
@@ -161,6 +171,10 @@ describe('MonoX Core', function () {
         await expect(this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address, this.dai.address, 
             bigNum(2), bigNum(600), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:INSUFF_OUTPUT")
+
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            0, bigNum(400), this.bob.address, deadline)).to.be.revertedWith("MonoX:INSUFF_INPUT")
 
         await this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address, this.dai.address, 
@@ -471,6 +485,12 @@ describe('MonoX Core', function () {
             bigNum(1), bigNum(590), this.bob.address, deadline,
             { ...overrides, value: bigNum(2) }
             )).to.be.revertedWith("MonoX:EXCESSIVE_INPUT")
+
+        await expect(this.router.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(1), 0, this.bob.address, deadline,
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoX:INSUFF_INPUT")
         
         await this.router.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
@@ -637,6 +657,15 @@ describe('MonoX Core', function () {
 
     it('should prevent the owner from altering the price of an active pair in the last 6000 blocks', async function () {
         await expectRevert(
+            this.pool.updatePoolPrice(this.weth.address, 0),
+            'MonoX:0_PRICE',
+          );
+        
+        await expectRevert(
+            this.pool.updatePoolPrice(this.vcash.address, bigNum(1)),
+            'MonoX:NO_POOL',
+            );
+        await expectRevert(
             this.pool.updatePoolPrice(this.weth.address, bigNum(30)),
             'MonoX:TOO_EARLY',
           );
@@ -761,6 +790,15 @@ describe('MonoX Core', function () {
 
         await this.pool.updatePriceAdjuster(this.bob.address, true);
         expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
+
+        await expect(this.pool.connect(this.alice).setSynthPoolPrice(this.aave.address,"100000000000"))
+            .to.be.revertedWith("MonoX:BAD_ROLE")
+
+        await expect(this.pool.connect(this.bob).setSynthPoolPrice(this.uni.address,"100000000000"))
+            .to.be.revertedWith("MonoX:NOT_SYNT")
+        
+        await expect(this.pool.connect(this.bob).setSynthPoolPrice(this.aave.address, "0"))
+            .to.be.revertedWith("MonoX:ZERO_PRICE")
 
         await this.pool.connect(this.bob).setSynthPoolPrice(this.aave.address,"100000000000");   
         expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
@@ -969,5 +1007,18 @@ describe('MonoX Core', function () {
         await expect(this.router.connect(this.bob).swapExactTokenForToken(
             this.uni.address, this.dai.address, 
             bigNum(2), bigNum(55), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:EXPIRED")
+    });
+
+    it('should revert if it is not router.', async function () {
+        const deadline = (await time.latest()) + 10000
+        this.pool.setTokenStatus(this.uni.address, 2)
+        await expect(this.pool.connect(this.bob).swapIn(
+            this.uni.address, this.dai.address, this.bob.address, this.alice.address,
+            bigNum(2))).to.be.revertedWith("MonoX:NOT_ROUTER")
+    });
+
+    it("should set token insurance", async function () {
+        this.pool.setTokenInsurance(this.uni.address, bigNum(100))
+        expect(await this.pool.tokenInsurance(this.uni.address)).to.equal(bigNum(100))
     });
 });

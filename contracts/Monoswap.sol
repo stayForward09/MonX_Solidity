@@ -95,11 +95,6 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     }
   }
 
-  modifier ensure(uint deadline) {
-    require(deadline >= block.timestamp, 'MonoX:EXPIRED');
-    _;
-  }  
-
   modifier onlyPriceAdjuster(){
     require(priceAdjusterRole[msg.sender]==true,"MonoX:BAD_ROLE");
     _;
