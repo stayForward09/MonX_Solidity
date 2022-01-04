@@ -158,6 +158,10 @@ describe('MonoX Core', function () {
 
         const deadline = (await time.latest()) + 10000
 
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            bigNum(2), bigNum(600), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:INSUFF_OUTPUT")
+
         await this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address, this.dai.address, 
             bigNum(2), bigNum(400), this.bob.address, deadline)
@@ -224,6 +228,11 @@ describe('MonoX Core', function () {
 
         expect(uniPrice0).to.greaterThan(20)
         expect(uniPrice0).to.lessThan(30)
+
+
+        await expect(this.router.connect(this.bob).swapTokenForExactToken(
+            this.vcash.address, this.uni.address, 
+            bigNum(300), bigNum(10),  this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:EXCESSIVE_INPUT")
 
         await this.router.connect(this.bob).swapTokenForExactToken(
             this.vcash.address, this.uni.address, 
@@ -390,6 +399,11 @@ describe('MonoX Core', function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
 
+        await expect(this.router.connect(this.bob).swapExactETHForToken(this.dai.address, 
+            bigNum(600), this.bob.address, deadline, 
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoswapRouter:INSUFF_OUTPUT")
+
         await this.router.connect(this.bob).swapExactETHForToken(this.dai.address, 
             bigNum(400), this.bob.address, deadline, 
             { ...overrides, value: bigNum(2) }
@@ -451,7 +465,13 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapETHForExactToken', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-
+        
+        await expect(this.router.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(1), bigNum(590), this.bob.address, deadline,
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoX:EXCESSIVE_INPUT")
+        
         await this.router.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
             bigNum(2), bigNum(590), this.bob.address, deadline,
@@ -487,7 +507,7 @@ describe('MonoX Core', function () {
         await this.router.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
             bigNum(1), bigNum(295), this.bob.address, deadline,
-            { ...overrides, value: bigNum(1) }
+            { ...overrides, value: bigNum(2) }
             )
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
@@ -514,6 +534,11 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        
+        await expect(this.router.connect(this.bob).swapExactTokenForETH(
+            this.dai.address, 
+            bigNum(610), bigNum(3), this.bob.address, deadline)).to.be.revertedWith("MonoX:INSUFF_OUTPUT")
+            
         await this.router.connect(this.bob).swapExactTokenForETH(
             this.dai.address, 
             bigNum(610), bigNum(2), this.bob.address, deadline)
@@ -560,6 +585,11 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+
+        await expect(this.router.connect(this.bob).swapTokenForExactETH(
+            this.dai.address, 
+            bigNum(500), bigNum(2), this.bob.address, deadline)).to.be.revertedWith("MonoX:EXCESSIVE_INPUT")
+
         await this.router.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
             bigNum(610), bigNum(2), this.bob.address, deadline)
@@ -931,5 +961,13 @@ describe('MonoX Core', function () {
 
         let devFee = await this.vcash.balanceOf(this.dev.address)
         console.log(smallNum(devFee.toString()))
+    });
+
+    it('should revert if it is expired.', async function () {
+        const deadline = (await time.latest()) - 1000
+        this.pool.setTokenStatus(this.uni.address, 2)
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.uni.address, this.dai.address, 
+            bigNum(2), bigNum(55), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:EXPIRED")
     });
 });
