@@ -35,6 +35,7 @@ describe('MonoX Core', function () {
             ...addrs
           ] = await ethers.getSigners();
         this.Monoswap = await ethers.getContractFactory('Monoswap');
+        this.MonoswapRouter = await ethers.getContractFactory('MonoswapRouter');
         this.MockERC20 = await ethers.getContractFactory('MockERC20');
         this.WETH9 = await ethers.getContractFactory('WETH9');
         this.vCASH = await ethers.getContractFactory('VCASH');
@@ -66,9 +67,13 @@ describe('MonoX Core', function () {
         await this.comp.transfer(this.bob.address, bigNum(10000000))  
         this.monoXPool = await upgrades.deployProxy(this.MonoXPool, [this.weth.address],{unsafeAllowLinkedLibraries:true})
         this.pool = await upgrades.deployProxy(this.Monoswap, [this.monoXPool.address, this.vcash.address],{unsafeAllowLinkedLibraries:true})
+        this.router = await this.MonoswapRouter.deploy(this.pool.address)
         this.vcash.setMinter(this.pool.address)
+        this.vcash.setMinter(this.minter.address)
         this.monoXPool.setAdmin(this.minter.address)
         this.monoXPool.transferOwnership(this.pool.address)
+        this.monoXPool.connect(this.minter).setRouter(this.router.address)
+        this.pool.setRouter(this.router.address)
         this.pool.setFeeTo(this.dev.address)
 
         const timestamp = (await time.latest()) + 10000;
@@ -96,34 +101,43 @@ describe('MonoX Core', function () {
         await this.pool.addSpecialToken(this.uni.address, bigNum(30), 2)
         await this.pool.addSpecialToken(this.comp.address, bigNum(30), 1) // unofficial pool
 
-        await this.pool.connect(this.alice).addLiquidity(this.weth.address, 
+        await this.router.connect(this.alice).addLiquidity(this.weth.address, 
             bigNum(500000), this.alice.address);
-        await this.pool.connect(this.alice).addLiquidityETH(
+        await this.router.connect(this.alice).addLiquidityETH(
             this.alice.address,
             { ...overrides, value: bigNum(500000) }
             );
             
-        await this.pool.connect(this.alice).addLiquidity(this.dai.address, 
+        await this.router.connect(this.alice).addLiquidity(this.dai.address, 
             bigNum(1000000), this.alice.address);
 
-        await this.pool.connect(this.alice).addLiquidity(this.aave.address, 
+        await this.router.connect(this.alice).addLiquidity(this.aave.address, 
             bigNum(1000), this.alice.address);       // 1000 aave is added by alice
 
-        await this.pool.connect(this.alice).addLiquidity(this.uni.address, 
+        await this.router.connect(this.alice).addLiquidity(this.uni.address, 
             bigNum(1000000), this.alice.address);
 
-        await this.pool.connect(this.alice).addLiquidity(this.comp.address, 
+        await this.router.connect(this.alice).addLiquidity(this.comp.address, 
             bigNum(1000000), this.alice.address);
-        
     })
 
-    // it("should set correct state variables", async function () {
-    //     const config = await this.pool.getConfig()
-    //     expect(config._vCASH).to.equal(this.vcash.address)
-    //     expect(config._feeTo).to.equal(this.dev.address)
-    //     expect(config._fees).to.equal(300)
-    //     expect(config._devFee).to.equal(50)
-    // });
+    it("should set correct state variables", async function () {
+        const config = await this.pool.getConfig()
+        expect(config._vCash).to.equal(this.vcash.address)
+        expect(config._feeTo).to.equal(this.dev.address)
+        expect(config._fees).to.equal(300)
+        expect(config._devFee).to.equal(50)
+    });
+
+    it("should set fees", async function () {
+        await expect(this.pool.setFees(1000)).to.be.revertedWith("")
+        this.pool.setFees(300)
+    });
+
+    it("should set dev fee", async function () {
+        await expect(this.pool.setDevFee(1000)).to.be.revertedWith("")
+        this.pool.setDevFee(50)
+    });
 
     it('should set uri successfully', async function () {
         await this.monoXPool.connect(this.minter).setURI("https://token-cdn-domain/\{id\}.json")
@@ -134,7 +148,7 @@ describe('MonoX Core', function () {
         let ethPool = await this.pool.pools(this.weth.address);
         expect(await ethPool.price.toString()).to.equal(bigNum(300))
 
-        await this.pool.connect(this.bob).addLiquidity(this.weth.address, 
+        await this.router.connect(this.bob).addLiquidity(this.weth.address, 
             bigNum(1000000),  this.bob.address);
 
         ethPool = await this.pool.pools(this.weth.address);
@@ -143,7 +157,7 @@ describe('MonoX Core', function () {
         let uniPool = await this.pool.pools(this.uni.address);
         expect(await uniPool.price.toString()).to.equal(bigNum(30))
 
-        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+        await this.router.connect(this.bob).addLiquidity(this.uni.address, 
             bigNum(1000000),  this.bob.address);
 
         uniPool = await this.pool.pools(this.uni.address);
@@ -154,7 +168,15 @@ describe('MonoX Core', function () {
 
         const deadline = (await time.latest()) + 10000
 
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            bigNum(2), bigNum(600), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:INSUFF_OUTPUT")
+
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.weth.address, this.dai.address, 
+            0, bigNum(400), this.bob.address, deadline)).to.be.revertedWith("MonoX:INSUFF_INPUT")
+
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address, this.dai.address, 
             bigNum(2), bigNum(400), this.bob.address, deadline)
 
@@ -179,8 +201,8 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - 2', async function () {
 
         const deadline = (await time.latest()) + 10000
-
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        this.pool.setTokenStatus(this.uni.address, 2)
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.uni.address, this.dai.address, 
             bigNum(2), bigNum(55), this.bob.address, deadline)
 
@@ -206,7 +228,7 @@ describe('MonoX Core', function () {
 
         const deadline = (await time.latest()) + 10000
 
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.uni.address, this.vcash.address, 
             bigNum(20), bigNum(400),  this.bob.address, deadline)
 
@@ -221,7 +243,12 @@ describe('MonoX Core', function () {
         expect(uniPrice0).to.greaterThan(20)
         expect(uniPrice0).to.lessThan(30)
 
-        await this.pool.connect(this.bob).swapTokenForExactToken(
+
+        await expect(this.router.connect(this.bob).swapTokenForExactToken(
+            this.vcash.address, this.uni.address, 
+            bigNum(300), bigNum(10),  this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:EXCESSIVE_INPUT")
+
+        await this.router.connect(this.bob).swapTokenForExactToken(
             this.vcash.address, this.uni.address, 
             bigNum(350), bigNum(10),  this.bob.address, deadline)
 
@@ -235,21 +262,52 @@ describe('MonoX Core', function () {
         expect(uniPrice0).to.lessThan(uniPrice1)
     });
 
+    it('should purchase and sell vCASH successfully - 2', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.router.connect(this.bob).swapTokenForExactToken(
+            this.uni.address, this.vcash.address, 
+            bigNum(20), bigNum(400),  this.bob.address, deadline)
+
+        let vcashbob0 = smallNum((await this.vcash.balanceOf(this.bob.address)).toString())
+
+        expect(vcashbob0).to.equal(400)
+        
+        let uniPool = await this.pool.pools(this.uni.address)
+        let uniPrice0 = smallNum(uniPool.price.toString())
+
+        expect(uniPrice0).to.greaterThan(20)
+        expect(uniPrice0).to.lessThan(30)
+
+        await this.router.connect(this.bob).swapExactTokenForToken(
+            this.vcash.address, this.uni.address, 
+            bigNum(350), bigNum(10),  this.bob.address, deadline)
+
+        let vcashbob1 = smallNum((await this.vcash.balanceOf( this.bob.address)).toString())
+
+        expect(vcashbob0-vcashbob1).to.equal(350)
+
+        uniPool = await this.pool.pools(this.uni.address)
+        const uniPrice1 = smallNum(uniPool.price.toString())
+        expect(uniPrice0).to.lessThan(uniPrice1)
+    });
+
     it('should remove liquidity successfully', async function () {
 
         const deadline = (await time.latest()) + 10000
 
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.dai.address, this.weth.address, 
             bigNum(15000), bigNum(45),  this.bob.address, deadline)
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 0)).toString()
 
         console.log('liquidity', liquidity);
-        await expect(this.pool.connect(this.alice).removeLiquidity(
+        await expect(this.router.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:WRONG_TIME") // remove liquidity after add liquidity
         await time.increase(60 * 60 * 4)
-        const results = await this.pool.connect(this.alice).removeLiquidity(
+        const results = await this.router.connect(this.alice).removeLiquidity(
             this.weth.address, liquidity, this.alice.address, 0, 0);
 
         let vcashAmount = await this.vcash.balanceOf(this.alice.address)
@@ -265,20 +323,20 @@ describe('MonoX Core', function () {
 
         const deadline = (await time.latest()) + 10000
 
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.dai.address, this.uni.address, 
             bigNum(15000), bigNum(450),  this.bob.address, deadline)
 
-        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+        await this.router.connect(this.bob).addLiquidity(this.uni.address, 
             bigNum(1000000),  this.bob.address);
         const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
 
         console.log('liquidity', liquidity);
-        await expect(this.pool.connect(this.alice).removeLiquidity(
+        await expect(this.router.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:WRONG_TIME")
         await time.increase(60 * 60 * 24)
-        const results = await this.pool.connect(this.alice).removeLiquidity(
+        const results = await this.router.connect(this.alice).removeLiquidity(
             this.uni.address, liquidity, this.alice.address, 0, 0);
 
         let vcashAmount = await this.vcash.balanceOf(this.alice.address)
@@ -294,13 +352,13 @@ describe('MonoX Core', function () {
 
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-        await this.pool.connect(this.bob).addLiquidityETH( 
+        await this.router.connect(this.bob).addLiquidityETH( 
             this.bob.address,
             { ...overrides, value: bigNum(1000000) }
             );
         const liquidity = (await this.monoXPool.balanceOf(this.bob.address, 0)).toString()
         await time.increase(60 * 60 * 24)
-        const results = await this.pool.connect(this.bob).removeLiquidityETH(
+        const results = await this.router.connect(this.bob).removeLiquidityETH(
             liquidity, this.bob.address, 0, 0);
 
         let vcashAmount = await this.vcash.balanceOf(this.bob.address)
@@ -323,7 +381,7 @@ describe('MonoX Core', function () {
         let yfiPool = await this.pool.pools(this.yfi.address)
         const yfiPrice0 = smallNum(yfiPool.price.toString())
 
-        await this.pool.connect(this.alice).swapTokenForExactToken(
+        await this.router.connect(this.alice).swapTokenForExactToken(
             this.dai.address, this.yfi.address, 
             bigNum(30000), bigNum(1), this.alice.address, deadline)
 
@@ -355,7 +413,12 @@ describe('MonoX Core', function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
 
-        await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
+        await expect(this.router.connect(this.bob).swapExactETHForToken(this.dai.address, 
+            bigNum(600), this.bob.address, deadline, 
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoswapRouter:INSUFF_OUTPUT")
+
+        await this.router.connect(this.bob).swapExactETHForToken(this.dai.address, 
             bigNum(400), this.bob.address, deadline, 
             { ...overrides, value: bigNum(2) }
             )
@@ -386,7 +449,7 @@ describe('MonoX Core', function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
 
-        await this.pool.connect(this.bob).swapExactETHForToken(this.dai.address, 
+        await this.router.connect(this.bob).swapExactETHForToken(this.dai.address, 
             bigNum(200), this.bob.address, deadline, 
             { ...overrides, value: bigNum(1) }
             )
@@ -401,7 +464,7 @@ describe('MonoX Core', function () {
         const daiPool = await this.pool.pools(this.dai.address);
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(250)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(300)
-        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(1)
+        expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.greaterThan(0.99)
         expect(smallNum(initialEthAmount.toString()) - smallNum(ethAmount.toString())).to.lessThan(2)
         expect(smallNum(await wethAmount.toString())).to.greaterThan(1000000)       //internal rebalancing happens
         expect(smallNum(await wethAmount.toString())).to.lessThan(1000000.002)
@@ -416,8 +479,20 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapETHForExactToken', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
+        
+        await expect(this.router.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(1), bigNum(590), this.bob.address, deadline,
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoX:EXCESSIVE_INPUT")
 
-        await this.pool.connect(this.bob).swapETHForExactToken(
+        await expect(this.router.connect(this.bob).swapETHForExactToken(
+            this.dai.address, 
+            bigNum(1), 0, this.bob.address, deadline,
+            { ...overrides, value: bigNum(2) }
+            )).to.be.revertedWith("MonoX:INSUFF_INPUT")
+        
+        await this.router.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
             bigNum(2), bigNum(590), this.bob.address, deadline,
             { ...overrides, value: bigNum(2) }
@@ -449,10 +524,10 @@ describe('MonoX Core', function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
 
-        await this.pool.connect(this.bob).swapETHForExactToken(
+        await this.router.connect(this.bob).swapETHForExactToken(
             this.dai.address, 
             bigNum(1), bigNum(295), this.bob.address, deadline,
-            { ...overrides, value: bigNum(1) }
+            { ...overrides, value: bigNum(2) }
             )
         
         const daiAmount = await this.dai.balanceOf(this.bob.address)
@@ -479,7 +554,12 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapExactTokenForETH', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-        await this.pool.connect(this.bob).swapExactTokenForETH(
+        
+        await expect(this.router.connect(this.bob).swapExactTokenForETH(
+            this.dai.address, 
+            bigNum(610), bigNum(3), this.bob.address, deadline)).to.be.revertedWith("MonoX:INSUFF_OUTPUT")
+            
+        await this.router.connect(this.bob).swapExactTokenForETH(
             this.dai.address, 
             bigNum(610), bigNum(2), this.bob.address, deadline)
         
@@ -502,7 +582,7 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapExactTokenForETH - 2', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-        await this.pool.connect(this.bob).swapExactTokenForETH(
+        await this.router.connect(this.bob).swapExactTokenForETH(
             this.dai.address, 
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
@@ -525,7 +605,12 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapTokenforExactETH', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-        await this.pool.connect(this.bob).swapTokenForExactETH(
+
+        await expect(this.router.connect(this.bob).swapTokenForExactETH(
+            this.dai.address, 
+            bigNum(500), bigNum(2), this.bob.address, deadline)).to.be.revertedWith("MonoX:EXCESSIVE_INPUT")
+
+        await this.router.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
             bigNum(610), bigNum(2), this.bob.address, deadline)
         
@@ -538,7 +623,7 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-610)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-600)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(1.9)
-        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(2)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThanOrEqual(2)
         expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 2)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
@@ -549,7 +634,7 @@ describe('MonoX Core', function () {
     it('should purchase and sell ERC-20 successfully - swapTokenforExactETH - 2', async function () {
         const deadline = (await time.latest()) + 10000
         const initialEthAmount = await ethers.provider.getBalance(this.bob.address)
-        await this.pool.connect(this.bob).swapTokenForExactETH(
+        await this.router.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
@@ -562,7 +647,7 @@ describe('MonoX Core', function () {
         expect(smallNum(await daiAmount.toString())-10000000).to.greaterThan(-305)
         expect(smallNum(await daiAmount.toString())-10000000).to.lessThan(-300)
         expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.greaterThan(0.9)
-        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThan(1)
+        expect(smallNum(ethAmount.toString()) - smallNum(initialEthAmount.toString())).to.lessThanOrEqual(1)
         expect(smallNum(await wethAmount.toString())).to.equal(1000000 - 1)
         expect(smallNum(await daiPool.price.toString())).to.greaterThan(0.999)
         expect(smallNum(await daiPool.price.toString())).to.lessThan(1)
@@ -572,6 +657,15 @@ describe('MonoX Core', function () {
 
     it('should prevent the owner from altering the price of an active pair in the last 6000 blocks', async function () {
         await expectRevert(
+            this.pool.updatePoolPrice(this.weth.address, 0),
+            'MonoX:0_PRICE',
+          );
+        
+        await expectRevert(
+            this.pool.updatePoolPrice(this.vcash.address, bigNum(1)),
+            'MonoX:NO_POOL',
+            );
+        await expectRevert(
             this.pool.updatePoolPrice(this.weth.address, bigNum(30)),
             'MonoX:TOO_EARLY',
           );
@@ -579,7 +673,7 @@ describe('MonoX Core', function () {
 
     it('should update last trading block for every trading', async function() {
         const deadline = (await time.latest()) + 10000
-        let recipt = await this.pool.connect(this.bob).swapTokenForExactETH(
+        let recipt = await this.router.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
@@ -591,7 +685,7 @@ describe('MonoX Core', function () {
     it('should allow the admin update pool price after 6000 blocks', async function() {
         this.timeout(0);
         const deadline = (await time.latest()) + 10000
-        let recipt = await this.pool.connect(this.bob).swapTokenForExactETH(
+        let recipt = await this.router.connect(this.bob).swapTokenForExactETH(
             this.dai.address, 
             bigNum(305), bigNum(1), this.bob.address, deadline)
         
@@ -611,7 +705,7 @@ describe('MonoX Core', function () {
         //pool has 1000 aave with 100$ price
         //prerequisites: 2246.57 + 100 AAVE
 
-        await this.pool.connect(this.bob).swapExactTokenForETH(
+        await this.router.connect(this.bob).swapExactTokenForETH(
             this.aave.address, 
             "2246570000000000000000", bigNum(2), this.bob.address, deadline)        // huge sellof so that the pool value is 0.0589351766$ after sale
 
@@ -619,12 +713,12 @@ describe('MonoX Core', function () {
 
         const bobAaveLPBefore = (await this.monoXPool.balanceOf(this.bob.address, 2)).toString();
 
-        await this.pool.connect(this.bob).addLiquidity(this.aave.address, 
+        await this.router.connect(this.bob).addLiquidity(this.aave.address, 
             bigNum(100), this.bob.address);       // 100 aave is added by bob
 
         const bobAaveLPAfter = (await this.monoXPool.balanceOf(this.bob.address, 2)).toString();
 
-        await this.pool.connect(this.bob).swapETHForExactToken(
+        await this.router.connect(this.bob).swapETHForExactToken(
             this.aave.address, 
             bigNum(1000),"2246570000000000000000", this.bob.address, deadline,
             { ...overrides, value: bigNum(1000) }
@@ -632,7 +726,7 @@ describe('MonoX Core', function () {
 
         console.log('liquidity before/after',bobAaveLPBefore,bobAaveLPAfter);   //we can see bob now has a huge number of lp
         await time.increase(60 * 60 * 24)
-        await this.pool.connect(this.bob).removeLiquidity(
+        await this.router.connect(this.bob).removeLiquidity(
             this.aave.address, bobAaveLPAfter, this.bob.address, 0, 0);
 
         // const bobAAVEAfter=await this.aave.balanceOf(this.bob.address)
@@ -648,7 +742,7 @@ describe('MonoX Core', function () {
         //pool has 1000 aave with 100$ price
        
 
-        await this.pool.connect(this.bob).swapExactTokenForETH(
+        await this.router.connect(this.bob).swapExactTokenForETH(
             this.aave.address, 
             "2246570000000000000000", bigNum(2), this.bob.address, deadline)        // huge sellof so that the pool value is 0.0589351766$ after sale
 
@@ -697,6 +791,15 @@ describe('MonoX Core', function () {
         await this.pool.updatePriceAdjuster(this.bob.address, true);
         expect(await this.pool.priceAdjusterRole(this.bob.address)).to.equal(true); //role granted
 
+        await expect(this.pool.connect(this.alice).setSynthPoolPrice(this.aave.address,"100000000000"))
+            .to.be.revertedWith("MonoX:BAD_ROLE")
+
+        await expect(this.pool.connect(this.bob).setSynthPoolPrice(this.uni.address,"100000000000"))
+            .to.be.revertedWith("MonoX:NOT_SYNT")
+        
+        await expect(this.pool.connect(this.bob).setSynthPoolPrice(this.aave.address, "0"))
+            .to.be.revertedWith("MonoX:ZERO_PRICE")
+
         await this.pool.connect(this.bob).setSynthPoolPrice(this.aave.address,"100000000000");   
         expect(((await this.pool.pools(this.aave.address)).price).toString()).to.equal("100000000000"); //price changed
 
@@ -712,7 +815,7 @@ describe('MonoX Core', function () {
 
         await this.pool.setPoolSizeMinLimit(bigNum(298000000));
 
-        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address,
             this.dai.address,
             bigNum(10000),
@@ -727,7 +830,7 @@ describe('MonoX Core', function () {
 
         await this.pool.setPoolSizeMinLimit(bigNum(298000000));
 
-        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address,
             this.dai.address,
             bigNum(10000),
@@ -738,7 +841,7 @@ describe('MonoX Core', function () {
 
         await this.pool.setPoolSizeMinLimit(bigNum(297000000));
 
-        await expect(this.pool.connect(this.bob).swapExactTokenForToken(
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address,
             this.dai.address,
             bigNum(10000),
@@ -754,7 +857,7 @@ describe('MonoX Core', function () {
 
         await this.pool.setPoolSizeMinLimit(bigNum(298000000));
 
-        await expect(this.pool.connect(this.bob).swapExactETHForToken(
+        await expect(this.router.connect(this.bob).swapExactETHForToken(
             this.dai.address,
             bigNum(400),
             this.bob.address,
@@ -769,7 +872,7 @@ describe('MonoX Core', function () {
 
         await this.pool.updatePoolStatus(this.dai.address,4);
 
-        await expect(this.pool.connect(this.alice).swapExactETHForToken(
+        await expect(this.router.connect(this.alice).swapExactETHForToken(
             this.dai.address,
             bigNum(400),
             this.bob.address,
@@ -800,7 +903,7 @@ describe('MonoX Core', function () {
         let feeToBalance = await this.weth.balanceOf(feeTo);
         expect(feeToBalance).to.equal(0);   //balance of fee to is 0
 
-        await this.pool.connect(this.bob).swapExactTokenForToken(
+        await this.router.connect(this.bob).swapExactTokenForToken(
             this.weth.address, this.dai.address, 
             bigNum(200), bigNum(400), this.bob.address, deadline)
 
@@ -818,23 +921,23 @@ describe('MonoX Core', function () {
 
         console.log('liquidity', liquidity);
         
-        await expect(this.pool.connect(this.alice).removeLiquidity(
+        await expect(this.router.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:WRONG_TIME") // remove liquidity after add liquidity
-        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+        await this.router.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address)
         await time.increase(60 * 60 * 24)
-        await expect(this.pool.connect(this.alice).removeLiquidity(
+        await expect(this.router.connect(this.alice).removeLiquidity(
             this.comp.address, liquidity, this.alice.address, 0, 0))
             .to.be.revertedWith("MonoX:TOP_HOLDER & WRONG_TIME") // burn restriction for largest LP holder
         
-        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+        await this.router.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(2000000), this.bob.address);
-        await this.pool.connect(this.alice).removeLiquidity(
+        await this.router.connect(this.alice).removeLiquidity(
                 this.comp.address, liquidity, this.alice.address, 0, 0);
         await time.increase(60 * 60 * 24 * 90)
         const bobLiquidity = (await this.monoXPool.balanceOf(this.bob.address, 4)).toString()
-        await this.pool.connect(this.alice).removeLiquidity(
+        await this.router.connect(this.alice).removeLiquidity(
             this.comp.address, bobLiquidity, this.bob.address, 0, 0);
     });
 
@@ -842,7 +945,7 @@ describe('MonoX Core', function () {
 
         let liquidity = (await this.monoXPool.balanceOf(this.alice.address, 4)).toString()
 
-        await this.pool.connect(this.bob).addLiquidity(this.comp.address, 
+        await this.router.connect(this.bob).addLiquidity(this.comp.address, 
             bigNum(500000), this.bob.address)
         
         await expect(this.monoXPool.connect(this.bob).safeTransferFrom(this.bob.address, this.alice.address, 4, bigNum(1), web3.utils.fromAscii('')))
@@ -861,7 +964,7 @@ describe('MonoX Core', function () {
 
     it('should transfer lp tokens in official pools', async function () {
 
-        await this.pool.connect(this.bob).addLiquidity(this.uni.address, 
+        await this.router.connect(this.bob).addLiquidity(this.uni.address, 
             bigNum(500000), this.bob.address)
         
         await time.increase(60 * 60 * 4)
@@ -872,5 +975,50 @@ describe('MonoX Core', function () {
         expect(await this.monoXPool.admin()).to.equal(this.minter.address)
         await this.monoXPool.connect(this.minter).setAdmin(this.alice.address)
         expect(await this.monoXPool.admin()).to.equal(this.alice.address)
+    });
+
+    it('should add and remove liquidity successfully - 2', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await this.vcash.connect(this.minter).mint(this.bob.address, bigNum(1000000))
+
+        await this.router.connect(this.bob).addLiquidityPair(this.uni.address, 
+            bigNum(1000000), bigNum(1000000),  this.bob.address);
+        console.log(await this.vcash.balanceOf(this.alice.address))
+        const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
+        console.log('liquidity', liquidity);
+        await time.increase(60 * 60 * 24)
+        const results = await this.router.connect(this.bob).removeLiquidity(
+            this.uni.address, liquidity, this.alice.address, 0, 0);
+
+        let vcashAmount = await this.vcash.balanceOf(this.alice.address)
+
+        expect(smallNum(vcashAmount.toString())).to.greaterThan(490000)
+        expect(smallNum(vcashAmount.toString())).to.lessThan(500000)
+
+        let devFee = await this.vcash.balanceOf(this.dev.address)
+        console.log(smallNum(devFee.toString()))
+    });
+
+    it('should revert if it is expired.', async function () {
+        const deadline = (await time.latest()) - 1000
+        this.pool.setTokenStatus(this.uni.address, 2)
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.uni.address, this.dai.address, 
+            bigNum(2), bigNum(55), this.bob.address, deadline)).to.be.revertedWith("MonoswapRouter:EXPIRED")
+    });
+
+    it('should revert if it is not router.', async function () {
+        const deadline = (await time.latest()) + 10000
+        this.pool.setTokenStatus(this.uni.address, 2)
+        await expect(this.pool.connect(this.bob).swapIn(
+            this.uni.address, this.dai.address, this.bob.address, this.alice.address,
+            bigNum(2))).to.be.revertedWith("MonoX:NOT_ROUTER")
+    });
+
+    it("should set token insurance", async function () {
+        this.pool.setTokenInsurance(this.uni.address, bigNum(100))
+        expect(await this.pool.tokenInsurance(this.uni.address)).to.equal(bigNum(100))
     });
 });

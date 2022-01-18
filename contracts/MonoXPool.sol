@@ -23,6 +23,7 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
     mapping (uint256 => mapping(address => uint256)) liquidityLastAdded;
     mapping (address => bool) whitelist;
     address public admin;
+    address public router;
 
     function initialize(
       address _WETH
@@ -37,6 +38,12 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
       require(admin == msg.sender, "MonoXPool:NOT_ADMIN");
       _;
     }
+
+    modifier onlyOwnerOrRouter() {
+      require(owner() == msg.sender || router == msg.sender, "MonoXPool:NOT_OWNER_ROUTER");
+      _;
+    }
+
     receive() external payable {
     }
     /**
@@ -110,11 +117,11 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
       IWETH(WETH).deposit{value: amount}();
     }
 
-    function withdrawWETH(uint256 amount) external onlyOwner{
+    function withdrawWETH(uint256 amount) external onlyOwnerOrRouter {
       IWETH(WETH).withdraw(amount);
     }
 
-    function safeTransferETH(address to, uint amount) external onlyOwner {
+    function safeTransferETH(address to, uint amount) external onlyOwnerOrRouter {
       TransferHelper.safeTransferETH(to, amount);
     }
 
@@ -146,5 +153,9 @@ contract MonoXPool is Initializable, OwnableUpgradeable, ERC1155Upgradeable {
 
     function setAdmin(address _admin) public onlyAdmin {
         admin = _admin;
+    }
+
+    function setRouter(address _router) public onlyAdmin {
+        router = _router;
     }
 }

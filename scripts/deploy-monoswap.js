@@ -13,6 +13,7 @@ async function main() {
   const network = await ethers.provider.getNetwork()
   const MonoXPool = await ethers.getContractFactory("MonoXPool")
   const Monoswap = await ethers.getContractFactory("Monoswap")
+  const MonoswapRouter = await ethers.getContractFactory("MonoswapRouter")
   const VCASH = await ethers.getContractFactory('VCASH')
   let WETH
   switch (network.chainId) {
@@ -49,14 +50,19 @@ async function main() {
   console.log("MonoXPool address:", monoXPool.address)
   const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vcash.address])
   console.log("Monoswap address:", monoswap.address)
+  const monoswapRouter = await MonoswapRouter.deploy(monoswap.address)
+  console.log("MonoswapRouter address:", monoswapRouter.address)
 
   await vcash.deployed()
   await monoXPool.deployed()
   await monoswap.deployed()
+  await monoswapRouter.deployed()
 
   await vcash.setMinter(monoswap.address)
+  await vcash.setMinter(deployer.address)
   await monoXPool.setAdmin(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
+  await monoXPool.setRouter(monoswapRouter.address)
   await monoswap.setFeeTo(deployer.address)
   
   
@@ -70,11 +76,15 @@ async function main() {
 
   if (network.chainId == 43113) return
   
-  await hre.run("verify:verify", {
-    address: vcash.address,
-    constructorArguments: [
-    ],
-  })
+  try {
+    await hre.run("verify:verify", {
+      address: vcash.address,
+      constructorArguments: [
+      ],
+    })
+  } catch(e) {
+    console.log(e)
+  }
   
   try {
     await hre.run("verify:verify", {
@@ -93,6 +103,17 @@ async function main() {
       ],
     })  
   } catch (e) {
+    console.log(e)
+  }
+
+  try {
+    await hre.run("verify:verify", {
+      address: monoswapRouter.address,
+      constructorArguments: [
+        monoswap.address
+      ],
+    })
+  } catch(e) {
     console.log(e)
   }
 }
