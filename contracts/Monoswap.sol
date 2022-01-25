@@ -709,6 +709,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // swap from tokenIn to tokenOut with fixed tokenIn amount.
   function swapIn (address tokenIn, address tokenOut, address from, address to,
       uint256 amountIn) public onlyRouter lockToken(tokenIn) lock returns(uint256 amountOut)  {
+    require (tokenIn != tokenOut, "MonoX:SAME_SWAP_TOKEN");
 
     address monoXPoolLocal = address(monoXPool);
 
@@ -758,6 +759,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   // swap from tokenIn to tokenOut with fixed tokenOut amount.
   function swapOut (address tokenIn, address tokenOut, address from, address to, 
       uint256 amountOut) public onlyRouter lockToken(tokenIn) lock returns(uint256 amountIn)  {
+    require (tokenIn != tokenOut, "MonoX:SAME_SWAP_TOKEN");
     uint256 tokenInPrice;
     uint256 tokenOutPrice;
     uint256 tradeVcashValue;

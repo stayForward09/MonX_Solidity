@@ -1021,4 +1021,17 @@ describe('MonoX Core', function () {
         this.pool.setTokenInsurance(this.uni.address, bigNum(100))
         expect(await this.pool.tokenInsurance(this.uni.address)).to.equal(bigNum(100))
     });
+
+    it('shouldn not swap same token', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        await expect(this.router.connect(this.bob).swapExactTokenForToken(
+            this.uni.address, this.uni.address, 
+            bigNum(20), bigNum(400),  this.bob.address, deadline)).to.be.revertedWith("VM Exception while processing transaction: revert MonoX:SAME_SWAP_TOKEN")
+
+        await expect(this.router.connect(this.bob).swapTokenForExactToken(
+            this.uni.address, this.uni.address, 
+            bigNum(350), bigNum(10),  this.bob.address, deadline)).to.be.revertedWith("VM Exception while processing transaction: revert MonoX:SAME_SWAP_TOKEN")
+    });
 });
