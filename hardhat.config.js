@@ -163,6 +163,7 @@ task("deploy-monoswap", "Deploy Monoswap contract")
   await monoXPool.setAdmin(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
   await monoXPool.setRouter(monoswapRouter.address)
+  await monoswap.setRouter(monoswapRouter.address)
   await monoswap.setFeeTo(deployer.address)
   
   
