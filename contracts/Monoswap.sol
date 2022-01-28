@@ -433,8 +433,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
   }
   
   // view func for removing liquidity
-  function _removeLiquidity (address user, address _token, uint256 liquidity,
-    address to) view public returns(
+  function _removeLiquidity (address user, address _token, uint256 liquidity) view public returns(
     uint256 poolValue, uint256 liquidityIn, uint256 vcashOut, uint256 tokenOut) {
     
     uint256 tokenBalanceVcashValue;
@@ -444,7 +443,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     (poolValue, tokenBalanceVcashValue, vcashCredit, vcashDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
-    liquidityIn = monoXPool.balanceOf(to, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(to, pool.pid);
+    liquidityIn = monoXPool.balanceOf(user, pool.pid)>liquidity?liquidity:monoXPool.balanceOf(user, pool.pid);
     uint256 tokenReserve = IERC20(_token).balanceOf(address(monoXPool));
     
     if(tokenReserve < pool.tokenBalance){
@@ -457,9 +456,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
 
     // if vcashCredit==0, vcashOut will be 0 as well
     vcashOut = liquidityIn.mul(vcashCredit).div(_totalSupply);
-
     tokenOut = liquidityIn.mul(tokenReserve).div(_totalSupply);
-
   }
 
   // actually removes liquidity
@@ -471,21 +468,23 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     PoolInfo memory pool = pools[_token];
     
     require (liquidity>0, "MonoX:BAD_AMOUNT");
+    
     {
       uint256 lastAdded = monoXPool.liquidityLastAddedOf(pool.pid, user);
+      lastAdded = lastAdded != 0 ? lastAdded : block.timestamp;
       uint256 lockTime;
       if (pool.status == PoolStatus.OFFICIAL) lockTime = 4 hours;
       else if (pool.status == PoolStatus.LISTED) lockTime = 24 hours;
       require(lastAdded + lockTime <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
     }
-    
+
     {
       address topLPHolder = monoXPool.topLPHolderOf(pool.pid);
       require(pool.status != PoolStatus.LISTED || user != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
     }
     uint256 poolValue;
     uint256 liquidityIn;
-    (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(user, _token, liquidity, to);
+    (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(user, _token, liquidity);
     _mintFee(pool.pid, pool.token, poolValue);
     require (vcashOut>=minVcashOut, "MonoX:INSUFF_vCash");
     require (tokenOut>=minTokenOut, "MonoX:INSUFF_TOKEN");
