@@ -437,19 +437,10 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     address to) view public returns(
     uint256 poolValue, uint256 liquidityIn, uint256 vcashOut, uint256 tokenOut) {
     
-    require (liquidity>0, "MonoX:BAD_AMOUNT");
     uint256 tokenBalanceVcashValue;
     uint256 vcashCredit;
     uint256 vcashDebt;
     PoolInfo memory pool = pools[_token];
-    uint256 lastAdded = monoXPool.liquidityLastAddedOf(pool.pid, user);
-    uint256 lockTime;
-    if (pool.status == PoolStatus.OFFICIAL) lockTime = 4 hours;
-    else if (pool.status == PoolStatus.LISTED) lockTime = 24 hours;
-    require(lastAdded + lockTime <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
-    address topLPHolder = monoXPool.topLPHolderOf(pool.pid);
-    require(pool.status != PoolStatus.LISTED || user != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
-
     (poolValue, tokenBalanceVcashValue, vcashCredit, vcashDebt) = getPool(_token);
     uint256 _totalSupply = monoXPool.totalSupplyOf(pool.pid);
 
@@ -478,6 +469,20 @@ contract Monoswap is Initializable, OwnableUpgradeable {
     bool isETH) onlyRouter lockToken(_token) external returns(uint256 vcashOut, uint256 tokenOut)  {
     require (tokenPoolStatus[_token]==1, "MonoX:NO_TOKEN");
     PoolInfo memory pool = pools[_token];
+    
+    require (liquidity>0, "MonoX:BAD_AMOUNT");
+    {
+      uint256 lastAdded = monoXPool.liquidityLastAddedOf(pool.pid, user);
+      uint256 lockTime;
+      if (pool.status == PoolStatus.OFFICIAL) lockTime = 4 hours;
+      else if (pool.status == PoolStatus.LISTED) lockTime = 24 hours;
+      require(lastAdded + lockTime <= block.timestamp, "MonoX:WRONG_TIME"); // Users are not allowed to remove liquidity right after adding
+    }
+    
+    {
+      address topLPHolder = monoXPool.topLPHolderOf(pool.pid);
+      require(pool.status != PoolStatus.LISTED || user != topLPHolder || pool.createdAt + 90 days < block.timestamp, "MonoX:TOP_HOLDER & WRONG_TIME"); // largest LP holder is not allowed to remove LP within 90 days after pool creation
+    }
     uint256 poolValue;
     uint256 liquidityIn;
     (poolValue, liquidityIn, vcashOut, tokenOut) = _removeLiquidity(user, _token, liquidity, to);
