@@ -14,7 +14,7 @@ async function main() {
   const MonoXPool = await ethers.getContractFactory("MonoXPool")
   const Monoswap = await ethers.getContractFactory("Monoswap")
   const MonoswapRouter = await ethers.getContractFactory("MonoswapRouter")
-  const VCASH = await ethers.getContractFactory('VCASH')
+  // const VCASH = await ethers.getContractFactory('VCASH')
   let WETH
   switch (network.chainId) {
     case 1: // mainnet
@@ -44,22 +44,23 @@ async function main() {
     default:
       throw new Error("unknown network");
   }
-  const vcash = await VCASH.deploy()
-  console.log("VCASH address:", vcash.address)
+  const vunit = ""
+  // const vcash = await VCASH.deploy()
+  // console.log("VCASH address:", vcash.address)
   const monoXPool = await upgrades.deployProxy(MonoXPool, [WETH])
   console.log("MonoXPool address:", monoXPool.address)
-  const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vcash.address])
+  const monoswap = await upgrades.deployProxy(Monoswap, [monoXPool.address, vunit])
   console.log("Monoswap address:", monoswap.address)
   const monoswapRouter = await MonoswapRouter.deploy(monoswap.address)
   console.log("MonoswapRouter address:", monoswapRouter.address)
 
-  await vcash.deployed()
+  // await vcash.deployed()
   await monoXPool.deployed()
   await monoswap.deployed()
   await monoswapRouter.deployed()
 
-  await vcash.setMinter(monoswap.address)
-  await vcash.setMinter(deployer.address)
+  // await vcash.setMinter(monoswap.address)
+  // await vcash.setMinter(deployer.address)
   await monoXPool.setAdmin(deployer.address)
   await monoXPool.transferOwnership(monoswap.address)
   await monoXPool.setRouter(monoswapRouter.address)
@@ -76,15 +77,15 @@ async function main() {
 
   if (network.chainId == 43113) return
   
-  try {
-    await hre.run("verify:verify", {
-      address: vcash.address,
-      constructorArguments: [
-      ],
-    })
-  } catch(e) {
-    console.log(e)
-  }
+  // try {
+  //   await hre.run("verify:verify", {
+  //     address: vcash.address,
+  //     constructorArguments: [
+  //     ],
+  //   })
+  // } catch(e) {
+  //   console.log(e)
+  // }
   
   try {
     await hre.run("verify:verify", {
