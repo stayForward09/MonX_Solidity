@@ -1034,4 +1034,19 @@ describe('MonoX Core', function () {
             this.uni.address, this.uni.address, 
             bigNum(350), bigNum(10),  this.bob.address, deadline)).to.be.revertedWith("VM Exception while processing transaction: revert MonoX:SAME_SWAP_TOKEN")
     });
+
+    it('user should not remove others liquidity', async function () {
+
+        const deadline = (await time.latest()) + 10000
+
+        const liquidity = (await this.monoXPool.balanceOf(this.alice.address, 3)).toString()
+        console.log('liquidity', liquidity);
+        await time.increase(60 * 60 * 24)
+        await expect(this.router.connect(this.bob).removeLiquidity(
+            this.uni.address, liquidity, this.alice.address, 0, 0)).to.be.revertedWith("MonoX:WRONG_TIME") // bob didn't added liquidity
+
+        await this.router.connect(this.alice).removeLiquidity(
+            this.uni.address, liquidity, this.alice.address, 0, 0)
+    });
+
 });
