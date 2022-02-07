@@ -499,7 +499,7 @@ contract Monoswap is Initializable, OwnableUpgradeable {
       monoXPool.safeTransferETH(to, tokenOut);
     }
 
-    monoXPool.burn(to, pool.pid, liquidityIn);
+    monoXPool.burn(user, pool.pid, liquidityIn);
 
     _syncPoolInfo(_token, 0, vcashOut);
 
