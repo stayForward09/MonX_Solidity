@@ -44,7 +44,7 @@ async function main() {
     default:
       throw new Error("unknown network");
   }
-  const vunit = ""
+  const vunit = "0x3829Bb12b9d665a6b64A96186da27eA17389f57b";
   // const vcash = await VCASH.deploy()
   // console.log("VCASH address:", vcash.address)
   const monoXPool = await upgrades.deployProxy(MonoXPool, [WETH])
